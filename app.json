@@ -40,6 +40,12 @@
     "entryPoint": "./index.js",
     "permissions": [
       "CAMERA"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ce661c8b-185a-41ef-b05e-21173e136109"
+      }
+    }
   }
 }
