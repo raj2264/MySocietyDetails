@@ -17,6 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AppLayout from '../components/AppLayout';
 import * as Linking from 'expo-linking';
+import { openFileLocally } from '../utils/file-opener';
 
 const PollsScreen = () => {
   const { theme, isDarkMode } = useTheme();
@@ -355,12 +356,7 @@ const PollsScreen = () => {
   
   const handleAttachmentPress = async (url) => {
     try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        Alert.alert('Error', 'Cannot open this file type');
-      }
+      await openFileLocally(url);
     } catch (error) {
       console.error('Error opening attachment:', error);
       Alert.alert('Error', 'Failed to open attachment');

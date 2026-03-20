@@ -21,6 +21,7 @@ import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import GuardSidebar from '../components/GuardSidebar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const GUARD_STORAGE_KEY = 'guard_data';
 
@@ -53,6 +54,8 @@ export default function GuardDashboardScreen() {
   
   const { theme, isDarkMode } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const bottomTabBarPadding = 55 + Math.max(insets.bottom, 0);
 
   // Add the missing generateAccessCode function
   const generateAccessCode = () => {
@@ -785,7 +788,7 @@ export default function GuardDashboardScreen() {
       ]}
     >
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.card }]}>
+      <View style={[styles.header, { backgroundColor: theme.card, paddingTop: insets.top + 10 }]}>
         <View style={styles.headerContent}>
           <View style={styles.headerLeft}>
             <TouchableOpacity 
@@ -835,7 +838,7 @@ export default function GuardDashboardScreen() {
       </View>
 
       {/* Recent Visitors */}
-      <View style={[styles.content, { paddingBottom: Platform.OS === 'ios' ? 85 : 65 }]}>
+      <View style={[styles.content, { paddingBottom: bottomTabBarPadding }]}>
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>
             Recent Visitors
@@ -1024,7 +1027,7 @@ export default function GuardDashboardScreen() {
         <View style={[{ 
           flex: 1, 
           backgroundColor: isDarkMode ? theme.background : 'white',
-          paddingTop: Platform.OS === 'ios' ? 60 : 40,
+          paddingTop: insets.top + 10,
           justifyContent: 'flex-start',
           alignItems: 'center'
         }]}>
@@ -1089,7 +1092,7 @@ export default function GuardDashboardScreen() {
         <View style={[{ 
           flex: 1, 
           backgroundColor: isDarkMode ? theme.background : 'white',
-          paddingTop: Platform.OS === 'ios' ? 60 : 40
+          paddingTop: insets.top + 10
         }]}>
           <View style={styles.modalHeader}>
             <TouchableOpacity
@@ -1307,7 +1310,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.1)',

@@ -175,7 +175,12 @@ export default function LoginScreen() {
           if (recentTerms && recentTerms.length > 0) {
             console.log('Using most recent terms acceptance:', recentTerms[0]);
             await refreshResidentData(data.user.id);
-            router.replace('/home');
+            // Check user_metadata for password_changed flag
+            if (data.user.user_metadata?.password_changed === true) {
+              router.replace('/home');
+            } else {
+              router.replace('/change-password?first_login=true');
+            }
             return;
           }
         }
@@ -189,13 +194,19 @@ export default function LoginScreen() {
         return;
       }
 
-      console.log('Terms already accepted, proceeding to home screen');
+      console.log('Terms already accepted, proceeding...');
 
       // Refresh resident data in context
       await refreshResidentData(data.user.id);
 
-      // Navigate to home screen
-      router.replace('/home');
+      // Check user_metadata for password_changed flag
+      if (data.user.user_metadata?.password_changed === true) {
+        console.log('Password already changed, going to home');
+        router.replace('/home');
+      } else {
+        console.log('First login detected, redirecting to password change');
+        router.replace('/change-password?first_login=true');
+      }
     } catch (error) {
       console.error('Login error:', error);
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
@@ -227,7 +238,14 @@ export default function LoginScreen() {
 
       setTermsAccepted(true);
       setShowTerms(false);
-      router.replace('/home');
+      
+      // Check user_metadata for password_changed flag
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser?.user_metadata?.password_changed === true) {
+        router.replace('/home');
+      } else {
+        router.replace('/change-password?first_login=true');
+      }
     } catch (error) {
       console.error('Error accepting terms:', error);
       Alert.alert('Error', 'Failed to accept terms. Please try again.');

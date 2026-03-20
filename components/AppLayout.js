@@ -4,12 +4,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
-  SafeAreaView,
   StatusBar,
   Platform,
   Dimensions,
   Animated,
-  PanResponder
+  PanResponder,
+  BackHandler
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
@@ -30,6 +30,9 @@ const SIDEBAR_WIDTH = width * 0.78;
 
 // Add event name constant
 export const NOTIFICATION_COUNT_CHANGED = 'NOTIFICATION_COUNT_CHANGED';
+
+// Main tab routes — these show the hamburger menu, NOT a back button
+const MAIN_TAB_ROUTES = ['/home', '/announcements', '/bills', '/complaints', '/visitors'];
 
 /**
  * AppLayout component to wrap all app screens with consistent UI elements
@@ -248,13 +251,50 @@ const NotificationsButton = memo(({ theme }) => {
   );
 });
 
-export default function AppLayout({ children, title, showBackButton = false, onBackPress, rightComponent }) {
+export default function AppLayout({ children, title, showBackButton, showBack, onBackPress, rightComponent }) {
   const { theme, isDarkMode } = useTheme();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
+  const router = useRouter();
   const prevPathRef = useRef(pathname);
   const isSidebarOpenRef = useRef(false);
+
+  // Auto-detect whether to show back button:
+  // - If explicitly set via showBackButton or showBack prop, use that
+  // - Otherwise, show back button on non-main-tab routes
+  const isMainTab = MAIN_TAB_ROUTES.includes(pathname);
+  const shouldShowBack = showBackButton !== undefined 
+    ? showBackButton 
+    : (showBack !== undefined ? showBack : !isMainTab);
+
+  // Default onBackPress to router.back() if not provided
+  const handleBackPress = onBackPress || (() => router.back());
+
+  // Android hardware back button handling
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      // If sidebar is open, close it
+      if (isSidebarOpenRef.current) {
+        setIsSidebarOpen(false);
+        return true;
+      }
+      // On sub-screens, go back
+      if (!isMainTab) {
+        router.back();
+        return true;
+      }
+      // On main tabs (not home), go to home
+      if (pathname !== '/home') {
+        router.replace('/home');
+        return true;
+      }
+      // On home screen, let the system handle it (exit app)
+      return false;
+    });
+
+    return () => backHandler.remove();
+  }, [pathname, isMainTab]);
   
   // Keep ref in sync for PanResponder (closures capture stale state)
   useEffect(() => {
@@ -415,9 +455,9 @@ export default function AppLayout({ children, title, showBackButton = false, onB
       >
         <View style={styles.headerContent}>
           <View style={styles.headerLeft}>
-            {showBackButton ? (
+            {shouldShowBack ? (
               <TouchableOpacity 
-                onPress={onBackPress} 
+                onPress={handleBackPress} 
                 style={[styles.iconButton, { backgroundColor: theme.border + '80' }]}
               >
                 <Ionicons name="arrow-back-outline" size={28} color={theme.text} />
@@ -468,9 +508,9 @@ export default function AppLayout({ children, title, showBackButton = false, onB
           transform: [{ translateY: pageEnterAnim }]
         }
       ]}>
-        <SafeAreaView style={[styles.content, { paddingBottom: 70 }]}>
+        <View style={[styles.content, { paddingBottom: 60 + Math.max(insets.bottom, 0) }]}>
           {children}
-        </SafeAreaView>
+        </View>
       </Animated.View>
       
       {/* Bottom Tab Bar */}

@@ -83,12 +83,12 @@ export default function HomeScreen() {
   const [hasAnimated, setHasAnimated] = useState(false);
   
   // Native-driver animation values - must ONLY be used with useNativeDriver: true
-  const entranceAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
-  const welcomeCardAnim = useRef(new Animated.Value(0.95)).current;
+  const entranceAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const welcomeCardAnim = useRef(new Animated.Value(1)).current;
   const shimmerAnim = useRef(new Animated.Value(-width)).current;
-  const textRevealAnim = useRef(new Animated.Value(20)).current;
+  const textRevealAnim = useRef(new Animated.Value(0)).current;
   
   // JS-only animation values - must ONLY be used with useNativeDriver: false
   const jsGlowAnim = useRef(new Animated.Value(0)).current;
@@ -96,14 +96,14 @@ export default function HomeScreen() {
   
   // Create animation arrays for staggered animations - native driver only
   const createAnimationArray = (size) => {
-    return Array(size).fill(0).map(() => new Animated.Value(0));
+    return Array(size).fill(0).map(() => new Animated.Value(1));
   };
   
   // Native-driver animations
   const actionButtonsAnim = useRef(createAnimationArray(4)).current;
   const featureAnimations = useRef(createAnimationArray(7)).current;
-  const titleAnim1 = useRef(new Animated.Value(-20)).current;
-  const titleAnim2 = useRef(new Animated.Value(-20)).current;
+  const titleAnim1 = useRef(new Animated.Value(0)).current;
+  const titleAnim2 = useRef(new Animated.Value(0)).current;
   
   // Debug features - set to false to hide debug options
   const [showDebugOptions, setShowDebugOptions] = useState(false);
@@ -155,98 +155,10 @@ export default function HomeScreen() {
   
   // Initialize all animations
   useEffect(() => {
-    if (!hasAnimated) {
-      // Start JS animations separately
-      runJsAnimations();
-      
-      // Native-driver animations sequence - fast entrance
-      const nativeAnimations = [
-        // Fade in main container with slide and scale - combined for speed
-        Animated.parallel([
-          Animated.timing(entranceAnim, {
-            toValue: 1,
-            duration: 200, 
-            useNativeDriver: true,
-          }),
-          Animated.timing(slideAnim, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(scaleAnim, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-        ]),
-        
-        // Animate welcome card - native driver only
-        Animated.parallel([
-          Animated.timing(welcomeCardAnim, {
-            toValue: 1,
-            duration: 180,
-            useNativeDriver: true,
-          }),
-          Animated.timing(textRevealAnim, {
-            toValue: 0,
-            duration: 200,
-            delay: 50,
-            useNativeDriver: true,
-          }),
-        ]),
-        
-        // Animate sections and content - combined for speed
-        Animated.parallel([
-          // First section title
-          Animated.timing(titleAnim1, {
-            toValue: 0,
-            duration: 180,
-            useNativeDriver: true,
-          }),
-          
-          // Quick action buttons with stagger (faster)
-          Animated.stagger(30,
-            actionButtonsAnim.map(anim => 
-              Animated.timing(anim, {
-                toValue: 1,
-                duration: 180,
-                useNativeDriver: true,
-              })
-            )
-          ),
-          
-          // Second section title
-          Animated.timing(titleAnim2, {
-            toValue: 0,
-            duration: 180,
-            delay: 80,
-            useNativeDriver: true,
-          }),
-        ]),
-        
-        // Animate feature cards with stagger (faster)
-        Animated.stagger(25,
-          featureAnimations.map(anim => 
-            Animated.timing(anim, {
-              toValue: 1,
-              duration: 200,
-              useNativeDriver: true,
-            })
-          )
-        ),
-      ];
-      
-      // Execute the native animation sequence separately
-      Animated.sequence(nativeAnimations).start(() => {
-        setHasAnimated(true);
-        // Start shimmer animation loop
-        loopShimmerEffect();
-      });
-    } else {
-      // If already animated, just start the effects
-      runJsAnimations();
-      loopShimmerEffect();
-    }
+    // No entrance animation - start effects directly
+    runJsAnimations();
+    loopShimmerEffect();
+    setHasAnimated(true);
     
     // Cleanup
     return () => {

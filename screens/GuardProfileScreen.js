@@ -17,6 +17,7 @@ import { supabase } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import TermsAcceptanceHistory from '../components/TermsAcceptanceHistory';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const GUARD_STORAGE_KEY = 'guard_data';
 
@@ -28,6 +29,7 @@ export default function GuardProfileScreen() {
   
   const { theme, isDarkMode, toggleTheme } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     loadGuardData();
@@ -136,7 +138,7 @@ export default function GuardProfileScreen() {
       }
     >
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.primary }]}>
+      <View style={[styles.header, { backgroundColor: theme.primary, paddingTop: insets.top + 16 }]}>
         <View style={styles.profileImageContainer}>
           <View style={[styles.profileImage, { backgroundColor: theme.primaryLight }]}>
             <Text style={styles.profileInitial}>
@@ -244,7 +246,6 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingTop: 60,
     paddingBottom: 20,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,

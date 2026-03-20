@@ -15,6 +15,7 @@ import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -103,6 +104,7 @@ const Pagination = ({ scrollX }) => {
 export default function WelcomeScreen() {
   const router = useRouter();
   const { theme, isDarkMode } = useTheme();
+  const insets = useSafeAreaInsets();
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollX = useRef(new Animated.Value(0)).current;
   const slidesRef = useRef(null);
@@ -246,7 +248,7 @@ export default function WelcomeScreen() {
         style={StyleSheet.absoluteFill}
       />
       
-      <BlurView intensity={20} style={styles.skipContainer}>
+      <BlurView intensity={20} style={[styles.skipContainer, { top: insets.top + 10 }]}>
         <TouchableOpacity
           onPress={() => router.replace('/login')}
           style={styles.skipButton}
@@ -277,7 +279,7 @@ export default function WelcomeScreen() {
 
       <Pagination scrollX={scrollX} />
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 24) }]}>
         <TouchableOpacity
           style={[
             styles.button,
@@ -309,7 +311,6 @@ const styles = StyleSheet.create({
   },
   skipContainer: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 40,
     right: 20,
     zIndex: 1,
     borderRadius: 20,
@@ -414,7 +415,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 24,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    paddingBottom: 24,
     width: '100%',
   },
   button: {

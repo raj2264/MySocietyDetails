@@ -26,6 +26,19 @@ import RazorpayCheckout from 'react-native-razorpay';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system/legacy';
+import { openFileLocally } from '../utils/file-opener';
+
+const SUPABASE_STORAGE_BASE = 'https://jjgsggmufkpadchkodab.supabase.co/storage/v1/object/public';
+
+function resolveBillUrl(pdfUrl) {
+  if (!pdfUrl) return null;
+  if (pdfUrl.startsWith('http')) return pdfUrl;
+  // Convert admin panel proxy URLs like /api/storage/maintenance-bills/bills/{id}.pdf
+  const match = pdfUrl.match(/^\/api\/storage\/(.+)$/);
+  if (match) return `${SUPABASE_STORAGE_BASE}/${match[1]}`;
+  return pdfUrl;
+}
 
 const BillsScreen = () => {
   const { theme, isDarkMode } = useTheme();
@@ -324,9 +337,11 @@ const BillsScreen = () => {
   };
 
   const handleViewBill = async (bill) => {
-    if (bill.pdf_url) {
+    const resolvedUrl = resolveBillUrl(bill.pdf_url);
+    if (resolvedUrl) {
       try {
-        await Linking.openURL(bill.pdf_url);
+        const fileName = `bill_${bill.bill_number || Date.now()}.pdf`;
+        await openFileLocally(resolvedUrl, { fileName, mimeType: 'application/pdf' });
       } catch (error) {
         console.error('Error opening PDF:', error);
       }
@@ -411,7 +426,8 @@ const BillsScreen = () => {
 
     setSharing(prev => ({ ...prev, [bill.id]: true }));
     try {
-      if (!bill.pdf_url) {
+      const resolvedUrl = resolveBillUrl(bill.pdf_url);
+      if (!resolvedUrl) {
         throw new Error('No PDF available for this bill');
       }
 
@@ -419,7 +435,7 @@ const BillsScreen = () => {
       const fileName = `bill_${format(new Date(bill.month_year), 'MMM_yyyy')}.pdf`;
       const tempUri = FileSystem.cacheDirectory + fileName;
       
-      const downloadResult = await FileSystem.downloadAsync(bill.pdf_url, tempUri);
+      const downloadResult = await FileSystem.downloadAsync(resolvedUrl, tempUri);
       
       if (downloadResult.status === 200) {
         const canShare = await Sharing.isAvailableAsync();

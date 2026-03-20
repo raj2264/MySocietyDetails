@@ -20,7 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AppLayout from '../components/AppLayout';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const AddComplaintScreen = () => {
   const { theme, isDarkMode } = useTheme();

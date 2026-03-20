@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: Platform.OS === 'ios' ? 85 : 65,
+    paddingBottom: 16,
   },
   headerSection: {
     marginBottom: 16,

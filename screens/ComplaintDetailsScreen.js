@@ -20,6 +20,7 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppLayout from '../components/AppLayout';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { openFileLocally } from '../utils/file-opener';
 
 const ComplaintDetailsScreen = () => {
   const { theme, isDarkMode } = useTheme();
@@ -263,12 +264,7 @@ const ComplaintDetailsScreen = () => {
 
   const handleAttachmentPress = async (url) => {
     try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        Alert.alert('Error', 'Cannot open image');
-      }
+      await openFileLocally(url);
     } catch (error) {
       console.error('Error opening attachment:', error);
       Alert.alert('Error', 'Failed to open image');
@@ -444,8 +440,8 @@ const ComplaintDetailsScreen = () => {
     <AppLayout title="Complaint Details" showBack={true}>
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 80}
       >
         <ScrollView
           ref={scrollViewRef}
@@ -603,7 +599,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 16,
   },
   header: {
     flexDirection: 'row',
@@ -701,10 +697,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   commentInputContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,

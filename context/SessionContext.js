@@ -11,51 +11,17 @@ export function SessionProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Function to check the current session
-    const checkSession = async () => {
-      try {
-        // Get the session from Supabase
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Error checking session:', error.message);
-          return;
-        }
-        
-        setSession(data.session);
-      } catch (error) {
-        console.error('Error in session check:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    // DON'T make a network call here — AuthContext already handles session restoration.
+    // Just listen for auth state changes to stay in sync.
+    setLoading(false);
 
-    // Call the function
-    checkSession();
-
-    // Subscribe to auth state changes
+    // Subscribe to auth state changes (AuthContext drives the actual auth flow)
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         setSession(newSession);
         
-        // Handle events if needed
-        switch (event) {
-          case 'SIGNED_IN':
-            console.log('User signed in');
-            break;
-          case 'SIGNED_OUT':
-            console.log('User signed out');
-            // Clear any stored data on sign out
-            await AsyncStorage.removeItem('guard_data');
-            break;
-          case 'TOKEN_REFRESHED':
-            console.log('Token refreshed');
-            break;
-          case 'USER_UPDATED':
-            console.log('User updated');
-            break;
-          default:
-            break;
+        if (event === 'SIGNED_OUT') {
+          await AsyncStorage.removeItem('guard_data');
         }
       }
     );

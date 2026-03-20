@@ -15,7 +15,7 @@ if (typeof global.process === 'undefined') {
   global.process = require('process/browser');
 }
 
-// Polyfill TextEncoder/TextDecoder if needed for Hermes
+// Only polyfill TextEncoder/TextDecoder if they don't already exist (newer Hermes has them)
 if (typeof global.TextEncoder === 'undefined') {
   global.TextEncoder = class TextEncoder {
     encode(input = '') {
@@ -32,12 +32,9 @@ if (typeof global.TextDecoder === 'undefined') {
   global.TextDecoder = class TextDecoder {
     decode(input) {
       if (typeof input === 'undefined') return '';
-      
-      // If it's an ArrayBuffer, convert it to a Uint8Array first
       if (input instanceof ArrayBuffer) {
         input = new Uint8Array(input);
       }
-      
       let result = '';
       for (let i = 0; i < input.length; i++) {
         result += String.fromCharCode(input[i]);

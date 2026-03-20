@@ -23,13 +23,15 @@ export default function ProfileScreen() {
   const { theme, isDarkMode } = useTheme();
   const { user, updateUserProfile, residentData } = useAuth();
   const router = useRouter();
+  const defaultAvatarUrl = 'https://xsgames.co/randomusers/avatar.php?g=pixel';
 
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [profileImage, setProfileImage] = useState(
-    user?.user_metadata?.avatar_url || 'https://xsgames.co/randomusers/avatar.php?g=pixel'
+    user?.user_metadata?.avatar_url || defaultAvatarUrl
   );
+  const [imageLoadError, setImageLoadError] = useState(false);
 
   // Form fields
   const [fullName, setFullName] = useState('');
@@ -67,6 +69,10 @@ export default function ProfileScreen() {
       setApartmentNo(user?.user_metadata?.apartment_no || '');
       setEmergencyContact(user?.user_metadata?.emergency_contact || '');
     }
+
+    const latestAvatar = user?.user_metadata?.avatar_url || defaultAvatarUrl;
+    setProfileImage(latestAvatar);
+    setImageLoadError(false);
   }, [residentData, user]);
 
   // Helper to pick image from gallery
@@ -87,7 +93,30 @@ export default function ProfileScreen() {
 
     if (!result.canceled) {
       setProfileImage(result.assets[0].uri);
+      setImageLoadError(false);
     }
+  };
+
+  // Upload avatar to Supabase Storage and return public URL
+  const uploadAvatarToStorage = async (localUri) => {
+    const ext = (localUri.split('.').pop().split('?')[0] || 'jpg').toLowerCase();
+    const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
+    const fileName = `${user.id}/avatar.${ext}`;
+
+    const response = await fetch(localUri);
+    const blob = await response.blob();
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(fileName, blob, { contentType: mimeType, upsert: true });
+
+    if (uploadError) throw uploadError;
+
+    const { data: publicData } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(fileName);
+
+    return publicData.publicUrl;
   };
 
   // Handle form submission
@@ -95,13 +124,20 @@ export default function ProfileScreen() {
     setIsLoading(true);
     
     try {
+      // Upload avatar to Supabase Storage if it's a local file
+      let avatarUrl = profileImage;
+      if (profileImage && !profileImage.startsWith('http')) {
+        avatarUrl = await uploadAvatarToStorage(profileImage);
+        setProfileImage(avatarUrl);
+      }
+
       // Prepare profile data
       const updatedProfile = {
         full_name: fullName,
         phone,
         apartment_no: apartmentNo,
         emergency_contact: emergencyContact,
-        avatar_url: profileImage,
+        avatar_url: avatarUrl,
       };
       
       // Update profile in Supabase
@@ -202,13 +238,24 @@ export default function ProfileScreen() {
         return;
       }
 
-      // Update password
+      // Update password and mark as changed in user_metadata
       const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword
+        password: newPassword,
+        data: { password_changed: true },
       });
 
       if (updateError) {
         throw updateError;
+      }
+
+      // Also try updating residents table (best effort)
+      if (user?.id) {
+        await supabase
+          .from('residents')
+          .update({ password_changed: true })
+          .eq('user_id', user.id)
+          .then(() => {})
+          .catch(() => {});
       }
 
       // Clear password fields
@@ -301,7 +348,17 @@ export default function ProfileScreen() {
         {/* Profile Header with Image */}
         <View style={styles.profileHeader}>
           <View style={styles.profileImageContainer}>
-            <Image source={{ uri: profileImage }} style={styles.profileImage} />
+            {profileImage && !imageLoadError ? (
+              <Image
+                source={{ uri: profileImage }}
+                style={styles.profileImage}
+                onError={() => setImageLoadError(true)}
+              />
+            ) : (
+              <View style={[styles.profileImageFallback, { backgroundColor: theme.primary + '20' }]}>
+                <Ionicons name="person" size={46} color={theme.primary} />
+              </View>
+            )}
             
             {isEditing && (
               <TouchableOpacity 
@@ -637,6 +694,13 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
+  },
+  profileImageFallback: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   changePhotoButton: {
     position: 'absolute',

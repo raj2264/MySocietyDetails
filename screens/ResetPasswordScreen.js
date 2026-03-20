@@ -17,6 +17,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useRouter } from 'expo-router';
 import DirectThemeToggle from '../components/DirectThemeToggle';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ResetPasswordScreen() {
   const [email, setEmail] = useState('');
@@ -24,6 +25,7 @@ export default function ResetPasswordScreen() {
   const { resetPassword } = useAuth();
   const { theme, isDarkMode } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const handleResetPassword = async () => {
     if (!email) {
@@ -57,7 +59,7 @@ export default function ResetPasswordScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.formContainer}>
             <TouchableOpacity 
-              style={[styles.backButton, { backgroundColor: theme.border + '40' }]}
+              style={[styles.backButton, { backgroundColor: theme.border + '40', top: insets.top + 10 }]}
               onPress={() => router.push('/login')}
             >
               <Ionicons name="arrow-back" size={24} color={theme.text} />

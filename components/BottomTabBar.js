@@ -4,9 +4,11 @@ import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 const TAB_WIDTH = width / 5;
+const TAB_BAR_CONTENT_HEIGHT = 60;
 
 /**
  * Ultra-smooth Bottom Tab Bar for navigation with optimized animations
@@ -16,6 +18,8 @@ export default memo(function BottomTabBar() {
   const pathname = usePathname();
   const { theme, isDarkMode } = useTheme();
   const { residentData } = useAuth();
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 0);
   const previousPathRef = useRef(pathname);
   
   // Initialize animation values properly
@@ -140,7 +144,9 @@ export default memo(function BottomTabBar() {
         styles.container, 
         { 
           backgroundColor: theme.card,
-          borderTopColor: theme.border
+          borderTopColor: theme.border,
+          height: TAB_BAR_CONTENT_HEIGHT + bottomInset,
+          paddingBottom: bottomInset,
         }
       ]}
     >
@@ -226,14 +232,12 @@ export default memo(function BottomTabBar() {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    height: 70,
     width: '100%',
     borderTopWidth: 1,
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    paddingBottom: 10,
     paddingTop: 8,
     elevation: 8,
     shadowColor: '#000',

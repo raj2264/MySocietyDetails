@@ -1,4 +1,8 @@
 node_modules/
+android/build/
+android/.gradle/
+android/app/build/
+android/app/.cxx/
 .expo/
 dist/
 web-build/

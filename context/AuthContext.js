@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, useContext } from 'react';
+import { createContext, useState, useEffect, useContext, useRef } from 'react';
 import { 
   signIn, 
   signOut, 
@@ -10,6 +10,7 @@ import {
 import { Alert, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
+import * as SplashScreen from 'expo-splash-screen';
 
 const AuthContext = createContext({});
 
@@ -23,6 +24,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [residentData, setResidentData] = useState(null);
   const [appState, setAppState] = useState(AppState.currentState);
+  const splashHidden = useRef(false);
 
   // Store session in AsyncStorage
   const storeSession = async (session) => {
@@ -125,6 +127,60 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Background session refresh — runs AFTER the UI is already visible with cached data.
+  // Silently validates/refreshes the token and updates resident data from the server.
+  const refreshSessionInBackground = async (cachedSession) => {
+    try {
+      console.log('AuthContext: Background refresh starting...');
+      
+      // Try to refresh/validate the session with the server
+      const { data: { session: refreshedSession }, error: refreshError } = 
+        await supabase.auth.setSession({
+          access_token: cachedSession.access_token,
+          refresh_token: cachedSession.refresh_token
+        });
+
+      if (refreshError || !refreshedSession) {
+        // Token is invalid/expired — try getSession as fallback
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        
+        if (!error && currentSession) {
+          setSession(currentSession);
+          setUser(currentSession.user);
+          await storeSession(currentSession);
+          // Refresh resident data in parallel with guard check
+          if (currentSession.user) {
+            refreshResidentData(currentSession.user.id);
+          }
+        } else {
+          // Session truly expired — clear state, user will be redirected to login
+          console.log('AuthContext: Session expired, clearing state');
+          setSession(null);
+          setUser(null);
+          setResidentData(null);
+          await storeSession(null);
+          await storeResidentData(null);
+        }
+        return;
+      }
+
+      // Session refreshed successfully — update state silently
+      setSession(refreshedSession);
+      setUser(refreshedSession.user);
+      await storeSession(refreshedSession);
+      
+      if (refreshedSession.user) {
+        // Fire-and-forget resident data refresh
+        refreshResidentData(refreshedSession.user.id);
+      }
+      
+      console.log('AuthContext: Background refresh complete');
+    } catch (error) {
+      console.error('AuthContext: Background refresh error:', error);
+      // Don't clear state on background error — keep using cached data
+    }
+  };
+
   // Handle app state changes
   useEffect(() => {
     const subscription = AppState.addEventListener('change', async (nextAppState) => {
@@ -140,15 +196,48 @@ export const AuthProvider = ({ children }) => {
     };
   }, [appState]);
 
-  // Load user and session on mount
+  // Hide splash screen once loading is done
+  useEffect(() => {
+    if (!loading && !splashHidden.current) {
+      splashHidden.current = true;
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [loading]);
+
+  // Load user and session on mount — CACHE-FIRST strategy
+  // 1. Instantly load cached session + resident data from AsyncStorage (no network)
+  // 2. Set loading=false so the UI renders immediately
+  // 3. Then refresh from network in the background
   useEffect(() => {
     const initializeAuth = async () => {
       try {
         setLoading(true);
-        await restoreSession();
+
+        // PHASE 1: Instant load from cache (no network)
+        const [storedSession, storedResident] = await Promise.all([
+          getStoredSession(),
+          getStoredResidentData(),
+        ]);
+
+        if (storedSession?.access_token && storedSession?.user) {
+          // We have cached data — use it immediately
+          setSession(storedSession);
+          setUser(storedSession.user);
+          if (storedResident) {
+            setResidentData(storedResident);
+          }
+          // Loading is done — user sees the app instantly
+          setLoading(false);
+
+          // PHASE 2: Background refresh (non-blocking)
+          refreshSessionInBackground(storedSession);
+        } else {
+          // No cached session — must do network restore
+          await restoreSession();
+          setLoading(false);
+        }
       } catch (error) {
         console.error('AuthContext: Error initializing auth:', error);
-      } finally {
         setLoading(false);
       }
     };
@@ -343,59 +432,48 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Function to refresh the resident data
+  // Function to refresh the resident data — optimized with parallel queries
   const refreshResidentData = async (userId) => {
     try {
-      // Check if user is authenticated
-      const { data: userData, error: userError } = await supabase.auth.getUser();
+      let currentUserId = userId;
       
-      if (userError || !userData?.user) {
-        console.log('Cannot refresh resident data: User not authenticated');
+      // Only call getUser() if we don't already have a userId
+      if (!currentUserId) {
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError || !userData?.user) {
+          console.log('Cannot refresh resident data: User not authenticated');
+          return false;
+        }
+        currentUserId = userData.user.id;
+      }
+      
+      // Run guard check and resident fetch in PARALLEL instead of sequentially
+      const [guardResult, residentResult] = await Promise.all([
+        supabase.from('guards').select('id').eq('user_id', currentUserId).maybeSingle(),
+        supabase.from('residents').select('*').eq('user_id', currentUserId).maybeSingle(),
+      ]);
+      
+      if (guardResult.error) {
+        console.error('Error checking guard status:', guardResult.error);
         return false;
       }
       
-      const currentUserId = userId || userData.user.id;
-      console.log('Checking user type for:', currentUserId);
-      
-      // First check if the user is a guard
-      const { data: guardData, error: guardError } = await supabase
-        .from('guards')
-        .select('id')
-        .eq('user_id', currentUserId)
-        .maybeSingle();
-      
-      if (guardError) {
-        console.error('Error checking guard status:', guardError);
+      // If user is a guard, don't use resident data
+      if (guardResult.data) {
+        console.log('User is a guard, skipping resident data');
         return false;
       }
       
-      // If user is a guard, don't try to fetch resident data
-      if (guardData) {
-        console.log('User is a guard, skipping resident data fetch');
+      if (residentResult.error) {
+        console.error('Error fetching resident data:', residentResult.error.message);
         return false;
       }
       
-      console.log('User is not a guard, fetching resident data');
-      
-      // Get the resident data for this user
-      const { data, error } = await supabase
-        .from('residents')
-        .select('*')
-        .eq('user_id', currentUserId)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching resident data:', error.message);
-        return false;
-      }
-      
-      if (data) {
-        console.log('Refreshed resident data:', data);
-        setResidentData(data);
-        storeResidentData(data);
+      if (residentResult.data) {
+        setResidentData(residentResult.data);
+        storeResidentData(residentResult.data);
         return true;
       } else {
-        console.log('No resident data found for user');
         setResidentData(null);
         storeResidentData(null);
         return false;

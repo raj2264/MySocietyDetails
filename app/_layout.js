@@ -1,26 +1,37 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Text, View, StyleSheet, useColorScheme } from 'react-native';
+import { Text, View, StyleSheet, useColorScheme, Platform, TouchableOpacity } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider, useTheme, darkTheme } from '../context/ThemeContext';
 import '../polyfills'; // Import polyfills before any network operations
 import { supabase } from '../lib/supabase';
-import * as SecureStore from 'expo-secure-store';
 import { SessionProvider } from '../context/SessionContext';
+import * as SplashScreen from 'expo-splash-screen';
+import useNotifications from '../hooks/useNotifications';
+
+// Prevent the native splash screen from auto-hiding.
+// We'll hide it once the app is ready (auth loaded).
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Simple error display component
-function ErrorDisplay() {
+function ErrorDisplay({ onRetry }) {
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
       <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' }}>
         An error occurred loading the app
       </Text>
       <Text style={{ textAlign: 'center', marginBottom: 20 }}>
-        Please check your internet connection and try again.
+        Please try again. If this continues, restart the app.
       </Text>
+      <TouchableOpacity
+        onPress={onRetry}
+        style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#2563EB', borderRadius: 8 }}
+      >
+        <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>Try Again</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -37,9 +48,14 @@ class ErrorBoundary extends React.Component {
     console.error('App error:', error, errorInfo);
   }
 
+  handleRetry = () => {
+    this.setState({ hasError: false });
+    this.props.onRetry?.();
+  };
+
   render() {
     if (this.state.hasError) {
-      return <ErrorDisplay />;
+      return <ErrorDisplay onRetry={this.handleRetry} />;
     }
     return this.props.children;
   }
@@ -49,6 +65,10 @@ class ErrorBoundary extends React.Component {
 function NavigationStack() {
   const { theme, isDarkMode } = useTheme();
   const backgroundColor = isDarkMode ? '#121212' : theme.background;
+  const startupSafeAnimation = Platform.OS === 'ios' ? 'default' : 'fade';
+
+  // Register push notifications & set up listeners
+  useNotifications();
 
   const screenBackground = {
     contentStyle: { backgroundColor },
@@ -62,8 +82,8 @@ function NavigationStack() {
       <Stack 
         screenOptions={{ 
           headerShown: false,
-          animation: 'fade',
-          animationDuration: 80,
+          animation: startupSafeAnimation,
+          animationDuration: 180,
           contentStyle: { backgroundColor },
           gestureEnabled: true,
           gestureDirection: 'horizontal',
@@ -72,12 +92,12 @@ function NavigationStack() {
           fullScreenGestureEnabled: true,
         }}
       >
-        <Stack.Screen name="welcome" options={screenBackground} />
-        <Stack.Screen name="index" options={screenBackground} />
-        <Stack.Screen name="login" options={screenBackground} />
-        <Stack.Screen name="guard-login" options={screenBackground} />
+        <Stack.Screen name="welcome" options={{ ...screenBackground, gestureEnabled: false }} />
+        <Stack.Screen name="index" options={{ ...screenBackground, gestureEnabled: false }} />
+        <Stack.Screen name="login" options={{ ...screenBackground, gestureEnabled: false }} />
+        <Stack.Screen name="guard-login" options={{ ...screenBackground, gestureEnabled: false }} />
         <Stack.Screen name="reset-password" options={screenBackground} />
-        <Stack.Screen name="home" options={screenBackground} />
+        <Stack.Screen name="home" options={{ ...screenBackground, gestureEnabled: false }} />
         <Stack.Screen name="announcements" options={screenBackground} />
         <Stack.Screen name="bills" options={screenBackground} />
         <Stack.Screen name="complaints" options={screenBackground} />
@@ -93,19 +113,26 @@ export default function RootLayout() {
   // Use system color scheme only as the initial background before ThemeProvider loads
   const colorScheme = useColorScheme();
   const initialBg = colorScheme === 'dark' ? '#121212' : '#FFFFFF';
+  const [appResetKey, setAppResetKey] = useState(0);
+
+  const handleBoundaryRetry = useCallback(() => {
+    setAppResetKey(prev => prev + 1);
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: initialBg }}>
-      <ErrorBoundary>
-        <SafeAreaProvider>
-          <ThemeProvider>
-            <AuthProvider>
-              <SessionProvider>
-                <NavigationStack />
-              </SessionProvider>
-            </AuthProvider>
-          </ThemeProvider>
-        </SafeAreaProvider>
+      <ErrorBoundary onRetry={handleBoundaryRetry}>
+        <View style={{ flex: 1 }} key={appResetKey}>
+          <SafeAreaProvider>
+            <ThemeProvider>
+              <AuthProvider>
+                <SessionProvider>
+                  <NavigationStack />
+                </SessionProvider>
+              </AuthProvider>
+            </ThemeProvider>
+          </SafeAreaProvider>
+        </View>
       </ErrorBoundary>
     </GestureHandlerRootView>
   );
@@ -113,10 +140,10 @@ export default function RootLayout() {
 
 // Update the unstable_settings
 export const unstable_settings = {
-  initialRouteName: 'welcome',
+  initialRouteName: 'index',
   initialRoutes: [
-    'welcome',
     'index',
+    'welcome',
     'login',
     'guard-login',
     'home',

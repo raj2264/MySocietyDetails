@@ -30,6 +30,6 @@ export default function Index() {
     return <Redirect href="/home" />;
   }
 
-  // Otherwise, redirect to login
-  return <Redirect href="/login" />;
+  // Otherwise, redirect to welcome carousel
+  return <Redirect href="/welcome" />;
 } 

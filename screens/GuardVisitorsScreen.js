@@ -20,6 +20,7 @@ import { supabase } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format, parseISO } from 'date-fns';
 import GuardSidebar from '../components/GuardSidebar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const GUARD_STORAGE_KEY = 'guard_data';
 
@@ -33,6 +34,8 @@ export default function GuardVisitorsScreen() {
   const [sidebarVisible, setSidebarVisible] = useState(false);
   
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+  const bottomTabBarPadding = 55 + Math.max(insets.bottom, 0);
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -232,9 +235,9 @@ export default function GuardVisitorsScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.card }]}>
+      <View style={[styles.header, { backgroundColor: theme.card, paddingTop: insets.top + 10 }]}>
         <View style={styles.headerContent}>
           <View style={styles.headerLeft}>
             <TouchableOpacity 
@@ -371,7 +374,7 @@ export default function GuardVisitorsScreen() {
       {/* Visitors List */}
       <ScrollView
         style={styles.visitorsList}
-        contentContainerStyle={[styles.visitorsListContent, { paddingBottom: Platform.OS === 'ios' ? 85 : 65 }]}
+        contentContainerStyle={[styles.visitorsListContent, { paddingBottom: bottomTabBarPadding }]}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
@@ -481,7 +484,7 @@ export default function GuardVisitorsScreen() {
         onClose={() => setSidebarVisible(false)} 
         guardData={guardData}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -490,7 +493,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.1)',

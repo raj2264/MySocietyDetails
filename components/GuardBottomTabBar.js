@@ -3,9 +3,11 @@ import { View, TouchableOpacity, Text, StyleSheet, Dimensions, Animated, Platfor
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 const TAB_WIDTH = width / 3; // 3 tabs
+const GUARD_TAB_BAR_CONTENT_HEIGHT = 55;
 
 /**
  * Bottom Tab Bar for the Guard App with optimized animations
@@ -13,6 +15,8 @@ const TAB_WIDTH = width / 3; // 3 tabs
 export default function GuardBottomTabBar() {
   const router = useRouter();
   const pathname = usePathname();
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 0);
   const { theme } = useTheme();
   const previousPathRef = useRef(pathname);
   
@@ -107,7 +111,9 @@ export default function GuardBottomTabBar() {
         styles.container, 
         { 
           backgroundColor: theme.card,
-          borderTopColor: theme.border
+          borderTopColor: theme.border,
+          height: GUARD_TAB_BAR_CONTENT_HEIGHT + bottomInset,
+          paddingBottom: bottomInset,
         }
       ]}
     >
@@ -193,8 +199,6 @@ export default function GuardBottomTabBar() {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    height: Platform.OS === 'ios' ? 85 : 65,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 10,
     borderTopWidth: 1,
     position: 'absolute',
     bottom: 0,

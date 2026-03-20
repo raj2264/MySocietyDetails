@@ -23,13 +23,6 @@
     }
   },
   "submit": {
-    "production": {
-      "ios": {
-        "asciiCredentialsSource": "local"
-      },
-      "android": {
-        "serviceAccount": "./service-account.json"
-      }
-    }
+    "production": {}
   }
 }

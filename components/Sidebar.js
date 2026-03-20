@@ -16,6 +16,7 @@ import { useAuth } from '../context/AuthContext';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DirectThemeToggle from './DirectThemeToggle';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 export const SIDEBAR_WIDTH = width * 0.78;
@@ -31,6 +32,7 @@ export default function Sidebar({ isOpen, onClose, translateX }) {
   const { user, signOut, residentData } = useAuth();
   const router = useRouter();
   const currentPath = usePathname();
+  const insets = useSafeAreaInsets();
   const [isRequestsOpen, setIsRequestsOpen] = useState(false);
   
   // Staggered menu item animations
@@ -133,8 +135,16 @@ export default function Sidebar({ isOpen, onClose, translateX }) {
   
   const handleNavigation = useCallback((route) => {
     onClose();
-    router.replace(route);
-  }, [onClose, router]);
+    // Skip if already on this route
+    if (currentPath === route) return;
+    // For home, replace to avoid stacking multiple home entries
+    if (route === '/home') {
+      router.replace(route);
+    } else {
+      // Push so back gesture works
+      router.push(route);
+    }
+  }, [onClose, router, currentPath]);
   
   const handleSignOut = useCallback(async () => {
     onClose();
@@ -202,6 +212,8 @@ export default function Sidebar({ isOpen, onClose, translateX }) {
             ],
             opacity: sidebarOpacity,
             borderRightColor: theme.border,
+            paddingTop: insets.top + 10,
+            paddingBottom: insets.bottom,
           }
         ]}
       >
@@ -427,7 +439,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 6, height: 0 },
     shadowOpacity: 0.35,
     shadowRadius: 12,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: 10,
   },
   header: {
     padding: 16,

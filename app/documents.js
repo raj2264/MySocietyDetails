@@ -4,11 +4,12 @@ import { useTheme } from '../context/ThemeContext';
 import AppLayout from '../components/AppLayout';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as DocumentPicker from 'expo-document-picker';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import * as IntentLauncher from 'expo-intent-launcher';
+import { openFileLocally } from '../utils/file-opener';
 
 export default function Documents() {
   const { theme, isDarkMode } = useTheme();
@@ -72,7 +73,8 @@ export default function Documents() {
   const handleViewDocument = async (document) => {
     try {
       const signedUrl = await getSignedUrl(document);
-      await Linking.openURL(signedUrl);
+      const fileName = sanitizeFileName(document.name);
+      await openFileLocally(signedUrl, { fileName, mimeType: 'application/pdf' });
     } catch (error) {
       console.error('Error viewing document:', error);
       Alert.alert('Error', 'Failed to open document');

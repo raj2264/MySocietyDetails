@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { EventRegister } from 'react-native-event-listeners';
 import { SIDEBAR_STATE_CHANGED } from '../app/(guard)/_layout';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 const SIDEBAR_WIDTH = width * 0.75;
@@ -52,6 +53,7 @@ export default function GuardSidebar({ visible, onClose, guardData }) {
   const router = useRouter();
   const pathname = usePathname();
   const { theme, isDarkMode } = useTheme();
+  const insets = useSafeAreaInsets();
   
   // Animation values with improved spring config
   const translateXAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
@@ -190,6 +192,8 @@ export default function GuardSidebar({ visible, onClose, guardData }) {
               { scale: scaleAnim }
             ],
             borderRightColor: theme.border,
+            paddingTop: insets.top + 10,
+            paddingBottom: insets.bottom,
           }
         ]}
       >
@@ -330,7 +334,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 4, height: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingTop: 10,
     zIndex: 1000,
   },
   header: {

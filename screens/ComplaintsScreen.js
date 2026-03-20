@@ -342,7 +342,7 @@ const ComplaintsScreen = () => {
   };
   
   return (
-    <AppLayout title="Complaints" showBack={true}>
+    <AppLayout title="Complaints">
       <View style={styles.container}>
         <View style={[styles.tabsContainer, { backgroundColor: isDarkMode ? theme.card : theme.card }]}>
           <TouchableOpacity
