@@ -35,7 +35,15 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-splash-screen",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#4361EE"
+        }
+      ]
     ],
     "entryPoint": "./index.js",
     "permissions": [
@@ -45,6 +53,11 @@
       "router": {},
       "eas": {
         "projectId": "ce661c8b-185a-41ef-b05e-21173e136109"
+      },
+      "firebase": {
+        "projectId": "mysocietydetails-81b64",
+        "senderId": "739124282012",
+        "apiKey": "AIzaSyB2Gh_3Otn-160S3kyzRfkBI9Trs6m-P3A"
       }
     }
   }

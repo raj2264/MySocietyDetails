@@ -1,29 +1,35 @@
 {
   "cli": {
-    "version": ">= 3.0.0",
-    "appVersionSource": "local"
+    "version": ">= 3.0.0"
   },
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "credentialsSource": "remote"
+      "distribution": "internal"
     },
     "preview": {
       "android": {
-        "buildType": "apk",
-        "credentialsSource": "remote"
+        "buildType": "apk"
       },
       "distribution": "internal"
     },
     "production": {
       "android": {
-        "buildType": "app-bundle",
-        "credentialsSource": "remote"
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "image": "latest"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "asciiCredentialsSource": "local"
+      },
+      "android": {
+        "serviceAccount": "./service-account.json"
+      }
+    }
   }
 }
