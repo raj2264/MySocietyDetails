@@ -6,16 +6,14 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "node": "24.4.0",
-      "install": "npm install --include=dev"
+      "node": "24.4.0"
     },
     "preview": {
       "android": {
         "buildType": "apk"
       },
       "distribution": "internal",
-      "node": "24.4.0",
-      "install": "npm install --include=dev"
+      "node": "24.4.0"
     },
     "production": {
       "android": {
@@ -24,8 +22,7 @@
       "ios": {
         "image": "latest"
       },
-      "node": "24.4.0",
-      "install": "npm install --include=dev"
+      "node": "24.4.0"
     }
   },
   "submit": {
