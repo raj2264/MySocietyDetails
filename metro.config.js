@@ -27,7 +27,6 @@ config.resolver.blockList = [
   /\/node_modules\/.*\/node_modules\/zlib\/.*/,
   /\/node_modules\/.*\/node_modules\/net\/.*/,
   /\/node_modules\/ws\/.*/,
-  /\/node_modules\/.*websocket.*/,
   /\/node_modules\/@supabase\/realtime-js\/.*/,
 ];
 
