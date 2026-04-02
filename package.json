@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "eas-build-pre-install": "npm install --package-lock-only",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
