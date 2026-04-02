@@ -16,7 +16,7 @@ import { createRazorpayAccount } from '../lib/payments'
 import { useTheme } from '../context/ThemeContext'
 
 export default function RazorpayAccountsScreen() {
-  const { theme } = useTheme()
+  const { theme, isDarkMode } = useTheme()
   const [societies, setSocieties] = useState([])
   const [loading, setLoading] = useState(true)
   const [modalVisible, setModalVisible] = useState(false)
@@ -163,7 +163,7 @@ export default function RazorpayAccountsScreen() {
           resetForm()
         }}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.02)' }]}>
           <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
             <Text style={[styles.modalTitle, { color: theme.text }]}>
               Add Razorpay Account
@@ -301,7 +301,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },

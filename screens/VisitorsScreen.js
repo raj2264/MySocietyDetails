@@ -21,20 +21,24 @@ import { supabase } from '../lib/supabase';
 import { useFocusEffect } from '@react-navigation/native';
 import VisitorForm from '../components/VisitorForm';
 import VisitorCard from '../components/VisitorCard';
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 
 export default function VisitorsScreen() {
   const [visitors, setVisitors] = useState([]);
   const [loading, setLoading] = useState(true);
+  useNoStuckLoading(loading, setLoading);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const hasLoadedOnceRef = useRef(false);
+  const isFetchingRef = useRef(false);
   
-  const { theme } = useTheme();
+  const { theme, isDarkMode } = useTheme();
   const { residentData } = useAuth();
 
   // Animation values
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const fadeAnim = useRef(new Animated.Value(0.95)).current;
+  const slideAnim = useRef(new Animated.Value(10)).current;
+  const scaleAnim = useRef(new Animated.Value(0.99)).current;
 
   // Add entrance animation
   useEffect(() => {
@@ -63,26 +67,30 @@ export default function VisitorsScreen() {
   // Load visitors when screen is focused
   useFocusEffect(
     useCallback(() => {
-      loadVisitors();
+      if (!residentData?.id || isFetchingRef.current) return;
+      const shouldShowLoader = !hasLoadedOnceRef.current;
+      if (shouldShowLoader) {
+        setLoading(true);
+      }
+      isFetchingRef.current = true;
+      Promise.resolve(loadVisitors())
+        .catch(error => console.error('Error in loadVisitors:', error))
+        .finally(() => {
+          isFetchingRef.current = false;
+          setLoading(false);
+          hasLoadedOnceRef.current = true;
+        });
       return () => {}; // cleanup function
-    }, [residentData])
+    }, [residentData?.id])
   );
 
-  // Load visitors on first render
-  useEffect(() => {
-    loadVisitors();
-  }, []);
-
-  const loadVisitors = async () => {
+  const loadVisitors = useCallback(async () => {
     if (!residentData?.id) {
-      console.log('No resident data available, cannot load visitors');
-      setLoading(false);
       return;
     }
 
     try {
       console.log('Loading visitors for resident ID:', residentData.id);
-      setLoading(true);
       
       const { data, error } = await supabase
         .from('visitors')
@@ -99,15 +107,19 @@ export default function VisitorsScreen() {
     } catch (error) {
       console.error('Error loading visitors:', error);
       Alert.alert('Error', 'Failed to load visitors');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
-  };
+  }, [residentData?.id]);
 
   const handleRefresh = () => {
+    if (isFetchingRef.current) return;
     setRefreshing(true);
-    loadVisitors();
+    isFetchingRef.current = true;
+    Promise.resolve(loadVisitors())
+      .catch(error => console.error('Error during refresh:', error))
+      .finally(() => {
+        isFetchingRef.current = false;
+        setRefreshing(false);
+      });
   };
 
   const handleAddVisitor = (newVisitor) => {
@@ -322,7 +334,7 @@ export default function VisitorsScreen() {
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}>
+        <View style={[styles.modalOverlay, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.02)' }]}>
           <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
             <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>
@@ -482,9 +494,12 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     flex: 1,
-    marginTop: 80,
+    marginTop: '12%',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    maxWidth: 600,
+    width: '100%',
+    alignSelf: 'center',
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },

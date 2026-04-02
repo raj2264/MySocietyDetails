@@ -22,6 +22,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AppLayout from '../components/AppLayout';
 import { useRouter } from 'expo-router';
 
+
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 const ComplaintsScreen = () => {
   const { theme, isDarkMode } = useTheme();
   const { user, residentData } = useAuth();
@@ -34,12 +36,14 @@ const ComplaintsScreen = () => {
   const [personalComplaints, setPersonalComplaints] = useState([]);
   const [communityComplaints, setCommunityComplaints] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  useNoStuckLoading(isLoading, setIsLoading);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const hasLoadedOnceRef = useRef(false);
   
   // State for animation
-  const fadeAnim = useState(new Animated.Value(0))[0];
-  const translateY = useState(new Animated.Value(20))[0];
+  const fadeAnim = useState(new Animated.Value(0.95))[0];
+  const translateY = useState(new Animated.Value(10))[0];
   
   // Format date helper function
   const formatDate = (dateString) => {
@@ -73,13 +77,19 @@ const ComplaintsScreen = () => {
   };
   
   // Function to fetch complaints data
-  const fetchComplaints = async () => {
+  const fetchComplaints = async (isRefresh = false) => {
     try {
+      setError(null);
       if (!residentData?.society_id) {
         console.log('No society ID found in resident data');
-        setPersonalComplaints([]);
-        setCommunityComplaints([]);
-        setError('Unable to fetch complaints. No society information found.');
+        if (residentData !== null && residentData !== undefined) {
+          setPersonalComplaints([]);
+          setCommunityComplaints([]);
+        }
+        if (!isRefresh) {
+          setIsLoading(false);
+        }
+        setIsRefreshing(false);
         return;
       }
       
@@ -122,14 +132,27 @@ const ComplaintsScreen = () => {
     } catch (error) {
       console.error('Exception while fetching complaints:', error);
       setError(`Unable to load complaints: ${error.message}`);
+    } finally {
+      if (!isRefresh) {
+        setIsLoading(false);
+      }
+      setIsRefreshing(false);
     }
   };
   
   // Fetch complaints when the screen is focused
   useFocusEffect(
     useCallback(() => {
-      setIsLoading(true);
-      fetchComplaints().finally(() => setIsLoading(false));
+      if (!residentData?.society_id) return;
+      const shouldShowLoader = !hasLoadedOnceRef.current;
+      if (shouldShowLoader) {
+        setIsLoading(true);
+      }
+
+      fetchComplaints(false).finally(() => {
+        setIsLoading(false);
+        hasLoadedOnceRef.current = true;
+      });
       
       return () => {
         // Clean up when screen loses focus
@@ -140,7 +163,7 @@ const ComplaintsScreen = () => {
   // Pull to refresh handler
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await fetchComplaints();
+    await fetchComplaints(true);
     setIsRefreshing(false);
   };
   
@@ -280,7 +303,7 @@ const ComplaintsScreen = () => {
   
   // Main content renderer
   const renderContent = () => {
-    if (isLoading) {
+    if (isLoading && !isRefreshing) {
       return <LoadingComponent />;
     }
     
@@ -459,13 +482,19 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 80, // Space for FAB
+    paddingBottom: 80,
+    maxWidth: 720,
+    width: '100%',
+    alignSelf: 'center',
   },
   emptyListContent: {
     flexGrow: 1,
     paddingHorizontal: 16,
-    paddingBottom: 80, // Space for FAB
+    paddingBottom: 80,
     justifyContent: 'center',
+    maxWidth: 720,
+    width: '100%',
+    alignSelf: 'center',
   },
   complaintCard: {
     borderRadius: 12,
@@ -480,17 +509,17 @@ const styles = StyleSheet.create({
   complaintHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 8,
   },
   complaintTitleContainer: {
     flex: 1,
-    marginRight: 8,
+    marginRight: 12,
   },
   complaintTitle: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   complaintDate: {
     fontSize: 12,
@@ -519,13 +548,16 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    minWidth: 84,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   badgeText: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 11,
+    fontWeight: '600',
   },
   emptyContainer: {
     alignItems: 'center',

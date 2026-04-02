@@ -18,8 +18,6 @@ module.exports = function(api) {
             'https': './lib/empty-module.js',
             // Replace crypto with our mock
             'crypto': './lib/crypto-mock.js',
-            // Replace Supabase realtime with mock
-            '@supabase/realtime-js': './lib/realtime-mock.js',
             // Fix for the useLatestCallback issue
             'use-latest-callback': './lib/useLatestCallback.js'
           }

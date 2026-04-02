@@ -1,3 +1,9 @@
-import GuardVisitorsScreen from '../../screens/GuardVisitorsScreen';
+import { View, Text } from 'react-native';
 
-export default GuardVisitorsScreen; 
+export default function GuardVisitors() {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <Text>Guard Visitors</Text>
+    </View>
+  );
+} 

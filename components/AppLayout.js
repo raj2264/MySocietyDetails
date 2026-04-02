@@ -40,7 +40,7 @@ const MAIN_TAB_ROUTES = ['/home', '/announcements', '/bills', '/complaints', '/v
  */
 
 // Add NotificationsButton component - memoized to prevent unnecessary re-renders
-const NotificationsButton = memo(({ theme }) => {
+const NotificationsButton = memo(({ theme, isDarkMode }) => {
   const router = useRouter();
   const { user } = useAuth();
   const [notificationCount, setNotificationCount] = useState(0);
@@ -225,7 +225,11 @@ const NotificationsButton = memo(({ theme }) => {
 
   return (
     <TouchableOpacity 
-      style={[styles.notificationButton, { backgroundColor: theme.primary + '20' }]}
+      style={[
+        styles.notificationButton,
+        { backgroundColor: theme.primary + '20' },
+        !isDarkMode && styles.lightIconButton,
+      ]}
       onPress={() => router.push('/notifications')}
       activeOpacity={0.7}
     >
@@ -468,8 +472,9 @@ export default function AppLayout({ children, title, showBackButton, showBack, o
                 style={[
                   styles.iconButton, 
                   { 
-                    backgroundColor: theme.primary + '30',
-                  }
+                    backgroundColor: isDarkMode ? theme.primary + '30' : theme.primary + '10',
+                  },
+                  !isDarkMode && styles.lightIconButton,
                 ]}
                 activeOpacity={0.7}
               >
@@ -495,7 +500,7 @@ export default function AppLayout({ children, title, showBackButton, showBack, o
           </View>
           
           <View style={styles.headerRight}>
-            {rightComponent || <NotificationsButton theme={theme} />}
+            {rightComponent || <NotificationsButton theme={theme} isDarkMode={isDarkMode} />}
           </View>
         </View>
       </Animated.View>
@@ -593,6 +598,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
+  lightIconButton: {
+    elevation: 0,
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -638,4 +652,4 @@ const styles = StyleSheet.create({
     // Add letter spacing for better readability
     letterSpacing: 0.2,
   },
-}); 
+});

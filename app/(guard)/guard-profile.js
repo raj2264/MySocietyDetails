@@ -1,3 +1,3 @@
-import GuardProfileScreen from '../../screens/GuardProfileScreen';
+import GuardProfileScreen from '../profile';
 
 export default GuardProfileScreen; 

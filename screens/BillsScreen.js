@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useWindowDimensions } from 'react-native';
 import {
   View,
   Text,
@@ -13,6 +14,7 @@ import {
   Modal,
   TextInput,
   Alert,
+  Image,
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../lib/supabase';
@@ -21,13 +23,16 @@ import { format } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
 import AppLayout from '../components/AppLayout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { createPaymentOrder, verifyPayment, getPaymentHistory, getPaymentReceipt } from '../lib/payments';
 import RazorpayCheckout from 'react-native-razorpay';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { openFileLocally } from '../utils/file-opener';
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 
 const SUPABASE_STORAGE_BASE = 'https://jjgsggmufkpadchkodab.supabase.co/storage/v1/object/public';
 
@@ -41,15 +46,18 @@ function resolveBillUrl(pdfUrl) {
 }
 
 const BillsScreen = () => {
+  const { width } = useWindowDimensions();
   const { theme, isDarkMode } = useTheme();
-  const { user } = useAuth();
+  const { user, residentData } = useAuth();
   const insets = useSafeAreaInsets();
   const [bills, setBills] = useState([]);
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
+  useNoStuckLoading(loading, setLoading);
   const [refreshing, setRefreshing] = useState(false);
+  useNoStuckLoading(refreshing, setRefreshing, 10000); // Safety: never let pull-to-refresh spinner hang
+  const hasLoadedOnceRef = useRef(false);
   const [selectedBill, setSelectedBill] = useState(null);
-  const [residentData, setResidentData] = useState(null);
   const [refundModalVisible, setRefundModalVisible] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [refundAmount, setRefundAmount] = useState('');
@@ -64,28 +72,9 @@ const BillsScreen = () => {
   const modalTranslateY = useRef(new Animated.Value(100)).current;
   const cardAnimations = useRef([]).current;
 
-  const fetchResidentData = async () => {
+  const fetchBills = useCallback(async () => {
     try {
-      const { data: resident, error } = await supabase
-        .from('residents')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error) throw error;
-      setResidentData(resident);
-      return resident;
-    } catch (error) {
-      console.error('Error fetching resident data:', error);
-      return null;
-    }
-  };
-
-  const fetchBills = async () => {
-    try {
-      setLoading(true);
-      const resident = await fetchResidentData();
-      if (!resident) return;
+      if (!residentData?.id) return;
 
       const { data, error } = await supabase
         .from('maintenance_bills')
@@ -98,7 +87,7 @@ const BillsScreen = () => {
             bank_details
           )
         `)
-        .eq('resident_id', resident.id)
+        .eq('resident_id', residentData.id)
         .order('bill_date', { ascending: false });
 
       if (error) throw error;
@@ -108,7 +97,7 @@ const BillsScreen = () => {
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('payments')
         .select('id, bill_id, society_id, status, razorpay_payment_id, completed_at, amount')
-        .eq('resident_id', resident.id)
+        .eq('resident_id', residentData.id)
         .eq('status', 'completed')
         .order('completed_at', { ascending: false });
       
@@ -117,10 +106,8 @@ const BillsScreen = () => {
       }
     } catch (error) {
       console.error('Error fetching bills:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [residentData?.id]);
 
   const handleDownloadReceipt = async (payment) => {
     try {
@@ -199,28 +186,20 @@ const BillsScreen = () => {
         base64: false,
       });
       
-      // Show success and offer to share/save
-      Alert.alert(
-        'Receipt Downloaded!',
-        'Your payment receipt PDF has been generated.',
-        [
-          {
-            text: 'Share',
-            onPress: async () => {
-              if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(uri, {
-                  mimeType: 'application/pdf',
-                  dialogTitle: 'Share Payment Receipt',
-                });
-              }
-            },
-          },
-          {
-            text: 'OK',
-            style: 'default',
-          },
-        ]
-      );
+      // Open the locally generated PDF directly (no download needed)
+      if (Platform.OS === 'android') {
+        const contentUri = await FileSystem.getContentUriAsync(uri);
+        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+          data: contentUri,
+          flags: 1,
+          type: 'application/pdf',
+        });
+      } else {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          UTI: 'com.adobe.pdf',
+        });
+      }
     } catch (error) {
       console.error('Error downloading receipt:', error);
       Alert.alert('Error', error.message || 'Failed to download receipt');
@@ -234,9 +213,23 @@ const BillsScreen = () => {
     return completedPayments.find(p => p.bill_id === billId);
   };
 
-  useEffect(() => {
-    fetchBills();
-  }, [user]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!residentData?.id) return;
+      
+      const shouldShowLoader = !hasLoadedOnceRef.current;
+      if (shouldShowLoader) {
+        setLoading(true);
+      }
+      
+      fetchBills()
+        .catch(error => console.error('Error in fetchBills:', error))
+        .finally(() => {
+          setLoading(false);
+          hasLoadedOnceRef.current = true;
+        });
+    }, [residentData?.id])
+  );
 
   useEffect(() => {
     // Clear previous animations
@@ -299,8 +292,13 @@ const BillsScreen = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchBills();
-    setRefreshing(false);
+    try {
+      await fetchBills();
+    } catch (error) {
+      console.error('Error during refresh:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const formatCurrency = (amount) => {
@@ -358,7 +356,7 @@ const BillsScreen = () => {
       // Initialize Razorpay payment
       const options = {
         description: `Maintenance Bill - ${format(new Date(bill.month_year), 'MMM yyyy')}`,
-        image: 'https://your-society-logo-url.com/logo.png',
+        image: Image.resolveAssetSource(require('../assets/images/msd-logo.jpeg')).uri,
         currency: 'INR',
         key: orderData.key_id,
         amount: orderData.amount * 100, // Convert to paise
@@ -376,7 +374,7 @@ const BillsScreen = () => {
       await verifyPayment(orderData.payment_id, orderData.society_id, paymentData);
 
       Alert.alert('Success', 'Payment completed successfully');
-      fetchBills();
+      await fetchBills({ showLoader: false });
     } catch (error) {
       console.error('Error processing payment:', error);
       if (error.code !== 'PAYMENT_CANCELLED') {
@@ -406,7 +404,7 @@ const BillsScreen = () => {
       Alert.alert('Success', 'Refund initiated successfully');
       setRefundModalVisible(false);
       resetRefundForm();
-      fetchBills();
+      await fetchBills({ showLoader: false });
     } catch (error) {
       console.error('Error initiating refund:', error);
       Alert.alert('Error', error.message);
@@ -477,14 +475,12 @@ const BillsScreen = () => {
       inputRange: [0, 1],
       outputRange: [0.95, 1],
     });
-
     const cardOpacity = animation.interpolate({
       inputRange: [0, 1],
-      outputRange: [0, 1],
+      outputRange: [0.95, 1],
     });
-
-    const payment = payments.find((p) => p.bill_id === bill.id);
-
+    // Responsive card width for tablet/phone
+    const cardWidth = width > 700 ? width * 0.6 : '100%';
     return (
       <Animated.View
         key={bill.id}
@@ -494,6 +490,8 @@ const BillsScreen = () => {
             backgroundColor: isDarkMode ? theme.card : '#fff',
             transform: [{ scale: cardScale }],
             opacity: cardOpacity,
+            width: cardWidth,
+            alignSelf: 'center',
           },
         ]}
       >
@@ -506,19 +504,13 @@ const BillsScreen = () => {
           <View style={styles.billHeader}>
             <View style={styles.billInfo}>
               <View style={styles.billTitleRow}>
-                <Text style={[styles.billNumber, { color: theme.text }]}>
-                  Bill #{bill.bill_number}
-                </Text>
-                <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
+                <Text style={[styles.billNumber, { color: theme.text }]}>Bill #{bill.bill_number}</Text>
+                <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}> 
                   <MaterialCommunityIcons name={statusIcon} size={14} color={statusColor} />
-                  <Text style={[styles.statusText, { color: statusColor }]}>
-                    {bill.status.replace('_', ' ')}
-                  </Text>
+                  <Text style={[styles.statusText, { color: statusColor }]}>{bill.status.replace('_', ' ')}</Text>
                 </View>
               </View>
-              <Text style={[styles.billDate, { color: theme.textSecondary }]}>
-                {format(new Date(bill.bill_date), 'MMMM yyyy')}
-              </Text>
+              <Text style={[styles.billDate, { color: theme.textSecondary }]}>{format(new Date(bill.bill_date), 'MMMM yyyy')}</Text>
             </View>
           </View>
 
@@ -526,20 +518,14 @@ const BillsScreen = () => {
           <View style={styles.amountSection}>
             <View style={styles.amountContainer}>
               <Text style={[styles.amountLabel, { color: theme.textSecondary }]}>Total Amount</Text>
-              <Text style={[styles.amount, { color: theme.text }]}>
-                {formatCurrency(bill.total_amount)}
-              </Text>
+              <Text style={[styles.amount, { color: theme.text }]}>{formatCurrency(bill.total_amount)}</Text>
             </View>
 
             {bill.status !== 'paid' && (
               <View style={styles.paymentProgressContainer}>
                 <View style={styles.paymentProgressHeader}>
-                  <Text style={[styles.paymentProgressLabel, { color: theme.textSecondary }]}>
-                    Payment Progress
-                  </Text>
-                  <Text style={[styles.paymentProgressPercentage, { color: theme.primary }]}>
-                    {paymentProgress.toFixed(0)}%
-                  </Text>
+                  <Text style={[styles.paymentProgressLabel, { color: theme.textSecondary }]}>Payment Progress</Text>
+                  <Text style={[styles.paymentProgressPercentage, { color: theme.primary }]}>{paymentProgress.toFixed(0)}%</Text>
                 </View>
                 <View style={[
                   styles.paymentProgress,
@@ -561,15 +547,11 @@ const BillsScreen = () => {
                 ]}>
                   <View style={styles.paymentRow}>
                     <Text style={[styles.paymentLabel, { color: theme.textSecondary }]}>Paid</Text>
-                    <Text style={[styles.paymentAmount, { color: theme.success }]}>
-                      {formatCurrency(totalPaid)}
-                    </Text>
+                    <Text style={[styles.paymentAmount, { color: theme.success }]}>{formatCurrency(totalPaid)}</Text>
                   </View>
                   <View style={styles.paymentRow}>
                     <Text style={[styles.paymentLabel, { color: theme.textSecondary }]}>Remaining</Text>
-                    <Text style={[styles.paymentAmount, { color: theme.error }]}>
-                      {formatCurrency(remainingAmount)}
-                    </Text>
+                    <Text style={[styles.paymentAmount, { color: theme.error }]}>{formatCurrency(remainingAmount)}</Text>
                   </View>
                 </View>
               </View>
@@ -583,6 +565,7 @@ const BillsScreen = () => {
               onPress={() => handleViewBill(bill)}
             >
               <Ionicons name="eye" size={20} color="white" />
+              <Text style={styles.actionButtonText}>View Bill PDF</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -593,7 +576,10 @@ const BillsScreen = () => {
               {sharing[bill.id] ? (
                 <ActivityIndicator size="small" color="white" />
               ) : (
-                <Ionicons name="share" size={20} color="white" />
+                <>
+                  <Ionicons name="share" size={20} color="white" />
+                  <Text style={styles.actionButtonText}>Share Bill</Text>
+                </>
               )}
             </TouchableOpacity>
 
@@ -610,7 +596,10 @@ const BillsScreen = () => {
                 {submitting ? (
                   <ActivityIndicator color="white" />
                 ) : (
-                  <Ionicons name="card" size={20} color="white" />
+                  <>
+                    <Ionicons name="card" size={20} color="white" />
+                    <Text style={styles.actionButtonText}>Pay Now</Text>
+                  </>
                 )}
               </TouchableOpacity>
             )}
@@ -618,7 +607,7 @@ const BillsScreen = () => {
 
           {/* Download Receipt for Completed Razorpay Payment */}
           {getCompletedPaymentForBill(bill.id) && (
-            <View style={[styles.receiptSection, { borderTopColor: theme.border }]}>
+            <View style={[styles.receiptSection, { borderTopColor: theme.border }]}> 
               <TouchableOpacity
                 style={[styles.downloadReceiptBtnFull, { backgroundColor: theme.success }]}
                 onPress={() => handleDownloadReceipt(getCompletedPaymentForBill(bill.id))}
@@ -629,7 +618,7 @@ const BillsScreen = () => {
                 ) : (
                   <>
                     <Ionicons name="receipt-outline" size={18} color="white" />
-                    <Text style={styles.downloadReceiptBtnFullText}>Download Payment Receipt</Text>
+                    <Text style={styles.downloadReceiptBtnFullText}>Download Receipt PDF</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -638,26 +627,17 @@ const BillsScreen = () => {
 
           {/* Payment History Section */}
           {bill.payment_history?.length > 0 && (
-            <View style={[styles.paymentHistorySection, { borderTopColor: theme.border }]}>
+            <View style={[styles.paymentHistorySection, { borderTopColor: theme.border }]}> 
               <View style={styles.paymentHistoryHeader}>
-                <Text style={[styles.paymentHistoryTitle, { color: theme.textSecondary }]}>
-                  Payment History
-                </Text>
+                <Text style={[styles.paymentHistoryTitle, { color: theme.textSecondary }]}>Payment History</Text>
               </View>
               {bill.payment_history.map((payment, idx) => (
                 <View key={idx} style={styles.paymentHistoryItem}>
                   <View style={styles.paymentHistoryInfo}>
-                    <Text style={[styles.paymentDate, { color: theme.text }]}>
-                      {format(new Date(payment.date), 'dd MMM yyyy')}
-                    </Text>
-                    <Text style={[styles.paymentMode, { color: theme.textSecondary }]}>
-                      {payment.mode}
-                      {payment.transaction_id ? ` - ${payment.transaction_id}` : ''}
-                    </Text>
+                    <Text style={[styles.paymentDate, { color: theme.text }]}>{format(new Date(payment.date), 'dd MMM yyyy')}</Text>
+                    <Text style={[styles.paymentMode, { color: theme.textSecondary }]}>{payment.mode}{payment.transaction_id ? ` - ${payment.transaction_id}` : ''}</Text>
                   </View>
-                  <Text style={[styles.paymentAmount, { color: theme.success }]}>
-                    {formatCurrency(payment.amount)}
-                  </Text>
+                  <Text style={[styles.paymentAmount, { color: theme.success }]}>{formatCurrency(payment.amount)}</Text>
                 </View>
               ))}
             </View>
@@ -679,7 +659,7 @@ const BillsScreen = () => {
           styles.modalOverlay,
           {
             opacity: modalOpacity,
-            backgroundColor: 'rgba(0,0,0,0.5)',
+            backgroundColor: isDarkMode ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.02)',
           },
         ]}
       >
@@ -847,7 +827,7 @@ const BillsScreen = () => {
   };
 
   const renderContent = () => {
-    if (loading) {
+    if (loading && !refreshing) {
       return (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.primary} />
@@ -895,6 +875,13 @@ const BillsScreen = () => {
   };
 
   const styles = StyleSheet.create({
+    actionButtonText: {
+      color: 'white',
+      fontSize: 13,
+      fontWeight: '600',
+      marginTop: 4,
+      textAlign: 'center',
+    },
     loadingContainer: {
       flex: 1,
       justifyContent: 'center',
@@ -913,6 +900,9 @@ const BillsScreen = () => {
     },
     billsList: {
       padding: 16,
+      maxWidth: 720,
+      width: '100%',
+      alignSelf: 'center',
     },
     billCard: {
       borderRadius: 16,
@@ -1024,7 +1014,7 @@ const BillsScreen = () => {
       gap: 8,
     },
     actionButton: {
-      padding: 12,
+      padding: 10,
       borderRadius: 12,
       flex: 1,
       alignItems: 'center',
@@ -1035,7 +1025,7 @@ const BillsScreen = () => {
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: 24,
-      paddingVertical: 12,
+      paddingVertical: 10,
       borderRadius: 10,
       flex: 1,
     },
@@ -1067,7 +1057,6 @@ const BillsScreen = () => {
     },
     modalOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -1195,7 +1184,7 @@ const BillsScreen = () => {
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: 16,
-      paddingVertical: 12,
+      paddingVertical: 10,
       borderRadius: 8,
       gap: 8,
     },
@@ -1277,7 +1266,7 @@ const BillsScreen = () => {
           resetRefundForm();
         }}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.02)' }]}>
           <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
             <Text style={[styles.modalTitle, { color: theme.text }]}>
               Request Refund

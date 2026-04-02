@@ -1,3 +1,9 @@
-import GuardDashboardScreen from '../../screens/GuardDashboardScreen';
+import { View, Text } from 'react-native';
 
-export default GuardDashboardScreen; 
+export default function GuardDashboard() {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <Text>Guard Dashboard</Text>
+    </View>
+  );
+} 

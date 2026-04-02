@@ -21,11 +21,12 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useRouter } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import DirectThemeToggle from '../components/DirectThemeToggle';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 
 const { width, height } = Dimensions.get('window');
 const RESIDENT_STORAGE_KEY = 'resident_data';
@@ -34,10 +35,11 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  useNoStuckLoading(isLoading, setIsLoading);
   const [showPassword, setShowPassword] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const { signIn, refreshResidentData } = useAuth();
+  const { signIn, refreshResidentData, user: authUser } = useAuth();
   const { theme, isDarkMode, animatedColors } = useTheme();
   const router = useRouter();
   
@@ -112,83 +114,42 @@ export default function LoginScreen() {
     try {
       console.log('Starting login process...');
       
-      // First sign in with Supabase
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password: password
-      });
+      // Use AuthContext's signIn — this sets user/session/residentData
+      // in context synchronously before we navigate, preventing race conditions
+      // where navigation happens before context state is ready.
+      const result = await signIn(email.trim().toLowerCase(), password);
 
-      if (error) {
-        console.error('Login error:', error);
-        Alert.alert('Error', error.message);
+      if (!result.success) {
+        Alert.alert('Error', result.error || 'Login failed');
         return;
       }
 
-      if (!data?.user) {
-        console.error('Login failed: No user data');
+      // Get the current user to check terms and password status
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
         Alert.alert('Error', 'Login failed');
         return;
       }
 
-      console.log('Login successful, user ID:', data.user.id);
-
-      // Check if user is a resident
-      const { data: residentData, error: residentError } = await supabase
-        .from('residents')
-        .select('*')
-        .eq('user_id', data.user.id)
-        .single();
-
-      if (residentError || !residentData) {
-        console.error('Resident check failed:', residentError);
-        // Sign out if user is not a resident
-        await supabase.auth.signOut();
-        Alert.alert('Error', 'You are not registered as a resident. Please check your credentials or contact your society admin.');
-        return;
-      }
-
-      console.log('Resident verification successful');
+      console.log('Login successful, user ID:', currentUser.id);
 
       // Check if terms are accepted
-      console.log('Checking terms acceptance for user:', data.user.id);
+      console.log('Checking terms acceptance for user:', currentUser.id);
       const { data: termsData, error: termsError } = await supabase
         .from('terms_acceptance')
         .select('*')
-        .eq('user_id', data.user.id)
+        .eq('user_id', currentUser.id)
         .eq('user_type', 'resident')
         .order('accepted_at', { ascending: false })
-        .limit(1)
-        .single();
+        .limit(1);
 
       if (termsError) {
         console.error('Error checking terms:', termsError);
-        if (termsError.code === 'PGRST116') {
-          console.log('Multiple terms acceptance records found, using most recent');
-          const { data: recentTerms } = await supabase
-            .from('terms_acceptance')
-            .select('*')
-            .eq('user_id', data.user.id)
-            .eq('user_type', 'resident')
-            .order('accepted_at', { ascending: false })
-            .limit(1);
-          
-          if (recentTerms && recentTerms.length > 0) {
-            console.log('Using most recent terms acceptance:', recentTerms[0]);
-            await refreshResidentData(data.user.id);
-            // Check user_metadata for password_changed flag
-            if (data.user.user_metadata?.password_changed === true) {
-              router.replace('/home');
-            } else {
-              router.replace('/change-password?first_login=true');
-            }
-            return;
-          }
-        }
       }
 
       console.log('Terms acceptance data:', termsData);
 
-      if (!termsData) {
+      if (!termsData || termsData.length === 0) {
         console.log('Terms not accepted, showing terms modal');
         setShowTerms(true);
         return;
@@ -196,11 +157,8 @@ export default function LoginScreen() {
 
       console.log('Terms already accepted, proceeding...');
 
-      // Refresh resident data in context
-      await refreshResidentData(data.user.id);
-
       // Check user_metadata for password_changed flag
-      if (data.user.user_metadata?.password_changed === true) {
+      if (currentUser.user_metadata?.password_changed === true) {
         console.log('Password already changed, going to home');
         router.replace('/home');
       } else {
@@ -238,6 +196,9 @@ export default function LoginScreen() {
 
       setTermsAccepted(true);
       setShowTerms(false);
+      
+      // Refresh resident data before navigating
+      await refreshResidentData(session.user.id);
       
       // Check user_metadata for password_changed flag
       const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -301,7 +262,7 @@ export default function LoginScreen() {
       transparent={true}
       onRequestClose={() => setShowTerms(false)}
     >
-      <View style={[styles.modalContainer, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.9)' : 'rgba(0,0,0,0.7)' }]}>
+      <View style={[styles.modalContainer, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.9)' : 'rgba(0,0,0,0.02)' }]}>
         <View style={[styles.modalContent, { backgroundColor: isDarkMode ? theme.background : '#fff' }]}>
           <ScrollView style={styles.termsScroll}>
             <Text style={[styles.termsTitle, { color: theme.text }]}>
@@ -397,9 +358,9 @@ export default function LoginScreen() {
                 { transform: [{ scale: logoScale }] }
               ]}>
                 <View style={[styles.logoCircle, { backgroundColor: theme.primary + '30' }]}>
-                  <MaterialCommunityIcons name="home-city" size={38} color={theme.primary} />
+                  <Image source={require('../assets/images/msd-logo.jpeg')} style={styles.logoImage} />
                 </View>
-                <Text style={[styles.title, { color: theme.text }]}>MySociety</Text>
+                <Text style={[styles.title, { color: theme.text }]}>My Society Details</Text>
                 <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
                   Welcome back to your community
                 </Text>
@@ -532,6 +493,8 @@ const styles = StyleSheet.create({
     padding: Math.min(24, width * 0.05),
     justifyContent: 'center',
     width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
   },
   logoContainer: {
     alignItems: 'center',
@@ -544,6 +507,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    overflow: 'hidden',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   title: {
     fontSize: Math.min(32, width * 0.08),
@@ -566,6 +534,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 12,
     width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   labelContainer: {
     flexDirection: 'row',

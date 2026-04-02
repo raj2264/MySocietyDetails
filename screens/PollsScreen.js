@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,8 @@ import AppLayout from '../components/AppLayout';
 import * as Linking from 'expo-linking';
 import { openFileLocally } from '../utils/file-opener';
 
+
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 const PollsScreen = () => {
   const { theme, isDarkMode } = useTheme();
   const { user, residentData } = useAuth();
@@ -27,12 +29,14 @@ const PollsScreen = () => {
   const [pollVotes, setPollVotes] = useState({});
   const [userVotes, setUserVotes] = useState({});
   const [isLoading, setIsLoading] = useState(true);
+  useNoStuckLoading(isLoading, setIsLoading);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const hasLoadedOnceRef = useRef(false);
   
   // Animation values
-  const fadeAnim = useState(new Animated.Value(0))[0];
-  const translateY = useState(new Animated.Value(20))[0];
+  const fadeAnim = useState(new Animated.Value(0.95))[0];
+  const translateY = useState(new Animated.Value(10))[0];
   
   const startAnimation = () => {
     Animated.parallel([
@@ -91,10 +95,13 @@ const PollsScreen = () => {
   // Fetch polls from Supabase
   const fetchPolls = async () => {
     try {
+      setError(null);
       if (!residentData?.society_id) {
         console.log('No society ID found in resident data');
-        setPolls([]);
-        setError('Unable to fetch polls. No society information found.');
+        if (!isRefresh) {
+          setIsLoading(false);
+        }
+        setIsRefreshing(false);
         return;
       }
       
@@ -295,7 +302,7 @@ const PollsScreen = () => {
   useEffect(() => {
     if (!residentData?.society_id) return;
     
-    const subscription = supabase
+    const channel = supabase
       .channel('poll-votes-changes')
       .on('postgres_changes', 
         { 
@@ -307,19 +314,28 @@ const PollsScreen = () => {
           console.log('Poll votes changed, refreshing data');
           fetchPolls();
         }
-      )
-      .subscribe();
+      );
+    
+    channel.subscribe();
     
     return () => {
-      supabase.removeChannel(subscription);
+      supabase.removeChannel(channel);
     };
   }, [residentData?.society_id]);
   
   // This effect runs when the screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      setIsLoading(true);
-      fetchPolls().finally(() => setIsLoading(false));
+      if (!residentData?.society_id) return;
+      const shouldShowLoader = !hasLoadedOnceRef.current;
+      if (shouldShowLoader) {
+        setIsLoading(true);
+      }
+
+      fetchPolls().finally(() => {
+        setIsLoading(false);
+        hasLoadedOnceRef.current = true;
+      });
       
       return () => {
         // Clean up if needed

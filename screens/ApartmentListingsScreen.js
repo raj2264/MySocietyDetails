@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,8 @@ import { useTheme } from '../context/ThemeContext';
 import AppLayout from '../components/AppLayout';
 import ListingForm from '../components/ListingForm';
 
+
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 const ApartmentListingsScreen = () => {
   const { user } = useAuth();
   const { isDarkMode, theme } = useTheme();
@@ -26,10 +28,12 @@ const ApartmentListingsScreen = () => {
   
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
+  useNoStuckLoading(loading, setLoading);
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingListing, setEditingListing] = useState(null);
   const [resident, setResident] = useState(null);
+  const hasLoadedOnceRef = useRef(false);
   
   // Fetch resident data
   const fetchResidentData = async () => {
@@ -49,11 +53,15 @@ const ApartmentListingsScreen = () => {
   };
   
   // Fetch apartment listings
-  const fetchListings = async () => {
+  const fetchListings = async (showLoader = true) => {
     try {
-      setLoading(true);
+      if (showLoader) {
+        setLoading(true);
+      }
       
-      if (!resident) return;
+      if (!resident) {
+        return;
+      }
       
       const { data, error } = await supabase
         .from('apartment_listings')
@@ -67,7 +75,7 @@ const ApartmentListingsScreen = () => {
       console.error('Error fetching apartment listings:', error);
       Alert.alert('Error', 'Failed to fetch your apartment listings');
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
       setRefreshing(false);
     }
   };
@@ -180,16 +188,23 @@ const ApartmentListingsScreen = () => {
   // Load data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      if (user) {
+      if (user && !hasLoadedOnceRef.current) {
         fetchResidentData();
+        hasLoadedOnceRef.current = true;
       }
     }, [user])
   );
   
+  const listingsLoadedRef = useRef(false);
+  
   // Fetch listings when resident data is available
   useEffect(() => {
     if (resident) {
-      fetchListings();
+      const shouldShowLoader = !listingsLoadedRef.current;
+      fetchListings(shouldShowLoader).finally(() => {
+        setLoading(false);
+        listingsLoadedRef.current = true;
+      });
     }
   }, [resident]);
   

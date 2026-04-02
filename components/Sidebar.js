@@ -19,7 +19,7 @@ import DirectThemeToggle from './DirectThemeToggle';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
-export const SIDEBAR_WIDTH = width * 0.78;
+export const SIDEBAR_WIDTH = Math.min(width * 0.78, 340);
 const SWIPE_CLOSE_THRESHOLD = SIDEBAR_WIDTH * 0.3;
 const SWIPE_VELOCITY_THRESHOLD = 0.5;
 
@@ -220,14 +220,21 @@ export default function Sidebar({ isOpen, onClose, translateX }) {
         <View style={[styles.header, { borderBottomColor: theme.border }]}>
           <View style={styles.logoContainer}>
             <View style={[styles.logoBackground, { backgroundColor: theme.primary + '20' }]}>
-              <Ionicons name="home" size={24} color={theme.primary} />
+              <Image source={require('../assets/images/msd-logo.jpeg')} style={styles.logoImage} />
             </View>
-            <Text style={[styles.logoText, { color: theme.text }]}>MySociety</Text>
+            <Text style={[styles.logoText, { color: theme.text }]}>My Society Details</Text>
           </View>
-          <View style={styles.userInfoContainer}>
+          <TouchableOpacity 
+            style={styles.userInfoContainer}
+            onPress={() => {
+              router.push('/profile');
+              onClose();
+            }}
+            activeOpacity={0.7}
+          >
             <Image 
               source={{ 
-                uri: user?.user_metadata?.avatar_url || 'https://xsgames.co/randomusers/avatar.php?g=pixel' 
+                uri: user?.user_metadata?.avatar_url || residentData?.avatar_url || 'https://xsgames.co/randomusers/avatar.php?g=pixel' 
               }}
               style={styles.avatar}
             />
@@ -242,7 +249,7 @@ export default function Sidebar({ isOpen, onClose, translateX }) {
                 {user?.email}
               </Text>
             </View>
-          </View>
+          </TouchableOpacity>
         </View>
         
         <View style={[styles.themeToggleContainer, { borderBottomColor: theme.border }]}>
@@ -458,6 +465,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    overflow: 'hidden',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   logoText: {
     fontSize: 20,

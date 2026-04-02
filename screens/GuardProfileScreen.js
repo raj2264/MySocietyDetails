@@ -19,11 +19,14 @@ import { useRouter } from 'expo-router';
 import TermsAcceptanceHistory from '../components/TermsAcceptanceHistory';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 const GUARD_STORAGE_KEY = 'guard_data';
 
 export default function GuardProfileScreen() {
   const [guardData, setGuardData] = useState(null);
   const [loading, setLoading] = useState(true);
+  useNoStuckLoading(loading, setLoading);
   const [refreshing, setRefreshing] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   
@@ -35,9 +38,11 @@ export default function GuardProfileScreen() {
     loadGuardData();
   }, []);
 
-  const loadGuardData = async () => {
+  const loadGuardData = async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (!isRefresh) {
+        setLoading(true);
+      }
       
       // Load guard data from AsyncStorage
       const guardDataString = await AsyncStorage.getItem(GUARD_STORAGE_KEY);
@@ -79,13 +84,15 @@ export default function GuardProfileScreen() {
       Alert.alert('Error', 'Failed to load guard data');
       router.replace('/guard-login');
     } finally {
-      setLoading(false);
+      if (!isRefresh) {
+        setLoading(false);
+      }
     }
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadGuardData();
+    await loadGuardData(true);
     setRefreshing(false);
   };
 
@@ -284,7 +291,7 @@ const styles = StyleSheet.create({
   societyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,

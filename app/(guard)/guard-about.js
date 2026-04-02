@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   Dimensions,
+  Image,
   TouchableOpacity,
   Linking,
   Platform
@@ -78,7 +79,7 @@ export default function GuardAboutScreen() {
         {/* Hero Section */}
         <View style={styles.heroSection}>
           <View style={[styles.logoContainer, { backgroundColor: theme.primary + '15' }]}>
-            <Ionicons name="shield" size={40} color={theme.primary} />
+            <Image source={require('../../assets/images/msd-logo.jpeg')} style={styles.logoImage} />
           </View>
           <Text style={[styles.appName, { color: theme.text }]}>MySociety Guard</Text>
           <Text style={[styles.tagline, { color: theme.text + 'CC' }]}>
@@ -193,6 +194,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    overflow: 'hidden',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   appName: {
     fontSize: 28,

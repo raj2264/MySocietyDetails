@@ -24,6 +24,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 
+
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width - 32;
 const CARD_HEIGHT = 180;
@@ -33,6 +35,7 @@ const ServicesScreen = () => {
   const { residentData } = useAuth();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
+  useNoStuckLoading(loading, setLoading);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [showBookingModal, setShowBookingModal] = useState(false);
@@ -49,9 +52,11 @@ const ServicesScreen = () => {
   const modalOpacity = new Animated.Value(0);
   const modalScale = new Animated.Value(0.9);
 
-  const loadServices = async () => {
+  const loadServices = async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (!isRefresh) {
+        setLoading(true);
+      }
       const { data, error } = await supabase
         .from('services')
         .select('*')
@@ -64,7 +69,9 @@ const ServicesScreen = () => {
       console.error('Error loading services:', error);
       Alert.alert('Error', 'Failed to load services');
     } finally {
-      setLoading(false);
+      if (!isRefresh) {
+        setLoading(false);
+      }
       setRefreshing(false);
     }
   };
@@ -75,7 +82,7 @@ const ServicesScreen = () => {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    loadServices();
+    loadServices(true);
   };
 
   const handleBookService = (service) => {
@@ -388,7 +395,7 @@ const ServicesScreen = () => {
           onRequestClose={handleCloseModal}
           statusBarTranslucent
         >
-          <View style={styles.modalOverlay}>
+          <View style={[styles.modalOverlay, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.02)' }]}>
             <View style={styles.modalContainer}>
               <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
                 <View style={styles.modalHeader}>
@@ -650,7 +657,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,

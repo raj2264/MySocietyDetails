@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,24 +18,24 @@ import { getSecurityContacts, getContactTypeLabel } from '../lib/securityContact
 import { useFocusEffect } from '@react-navigation/native';
 import AppLayout from '../components/AppLayout';
 
+
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 const SecurityContactsScreen = () => {
   const { user, residentData } = useAuth();
   const { theme } = useTheme();
   const [contacts, setContacts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  useNoStuckLoading(loading, setLoading);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const hasLoadedOnceRef = useRef(false);
 
   const loadContacts = async () => {
     if (!residentData?.society_id) {
-      console.log("No society ID available:", residentData);
-      setLoading(false);
-      setError('Unable to load contacts. Society information not available.');
       return;
     }
     
     try {
-      setLoading(true);
       setError(null);
       console.log("Loading contacts for society:", residentData.society_id);
       const { data, error } = await getSecurityContacts(residentData.society_id);
@@ -71,23 +71,30 @@ const SecurityContactsScreen = () => {
     } catch (err) {
       console.error('Error loading emergency contacts:', err);
       setError('Failed to load emergency contacts. Please try again.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
   };
 
-  // Load contacts when screen is focused
-  useFocusEffect(
-    useCallback(() => {
-      loadContacts();
-    }, [residentData?.society_id])
-  );
-
   const handleRefresh = () => {
     setRefreshing(true);
-    loadContacts();
+    loadContacts().finally(() => {
+      setRefreshing(false);
+    });
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!residentData?.society_id) {
+        setLoading(false);
+        return;
+      }
+      const shouldShowLoader = !hasLoadedOnceRef.current;
+      if (shouldShowLoader) setLoading(true);
+      loadContacts().finally(() => {
+        setLoading(false);
+        hasLoadedOnceRef.current = true;
+      });
+    }, [residentData?.society_id])
+  );
 
   const handleCall = (phoneNumber) => {
     Linking.openURL(`tel:${phoneNumber}`);
@@ -229,6 +236,9 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
+    maxWidth: 700,
+    width: '100%',
+    alignSelf: 'center',
   },
   section: {
     marginBottom: 20,
@@ -276,9 +286,9 @@ const styles = StyleSheet.create({
   },
   callButton: {
     backgroundColor: '#4f46e5',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -17,7 +17,10 @@ import AppLayout from '../components/AppLayout';
 import { getResidentVehicles, setPrimaryVehicle, deleteVehicle } from '../lib/vehicles';
 import VehicleForm from '../components/VehicleForm';
 import VehicleCard from '../components/VehicleCard';
+import { useFocusEffect } from '@react-navigation/native';
 
+
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 export default function VehiclesScreen() {
   const { theme } = useTheme();
   const router = useRouter();
@@ -26,27 +29,45 @@ export default function VehiclesScreen() {
   
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
+  useNoStuckLoading(loading, setLoading);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddVehicleForm, setShowAddVehicleForm] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState(null);
+  const hasLoadedOnceRef = useRef(false);
+  const isFetchingRef = useRef(false);
   
-  // Load vehicles when component mounts or refreshes
-  useEffect(() => {
-    loadVehicles();
-  }, [residentData]);
+  // Load vehicles when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (!residentData?.id || isFetchingRef.current) return;
+      const shouldShowLoader = !hasLoadedOnceRef.current;
+      if (shouldShowLoader) {
+        setLoading(true);
+      }
+      isFetchingRef.current = true;
+      Promise.resolve(loadVehicles())
+        .catch(error => console.error('Error in loadVehicles:', error))
+        .finally(() => {
+          isFetchingRef.current = false;
+          setLoading(false);
+          hasLoadedOnceRef.current = true;
+        });
+    }, [residentData?.id])
+  );
 
   // Check if we need to refresh after vehicle update
   useEffect(() => {
-    if (params.refresh === 'true') {
+    if (params.refresh === 'true' && !isFetchingRef.current) {
       loadVehicles();
     }
-  }, [params.refresh]);
+  }, [params.refresh, loadVehicles]);
 
-  const loadVehicles = async () => {
-    if (!residentData?.id) return;
+  const loadVehicles = useCallback(async () => {
+    if (!residentData?.id) {
+      return;
+    }
     
     try {
-      setLoading(true);
       const result = await getResidentVehicles(residentData.id);
       if (result.success) {
         setVehicles(result.data || []);
@@ -56,15 +77,19 @@ export default function VehiclesScreen() {
       }
     } catch (error) {
       console.error('Exception loading vehicles:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
-  };
+  }, [residentData?.id]);
 
   const handleRefresh = () => {
+    if (isFetchingRef.current) return;
     setRefreshing(true);
-    loadVehicles();
+    isFetchingRef.current = true;
+    Promise.resolve(loadVehicles())
+      .catch(error => console.error('Error during refresh:', error))
+      .finally(() => {
+        isFetchingRef.current = false;
+        setRefreshing(false);
+      });
   };
 
   const handleAddVehicle = () => {

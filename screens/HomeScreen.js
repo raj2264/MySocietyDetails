@@ -28,36 +28,77 @@ import {
 } from '../lib/storage';
 import DirectThemeToggle from '../components/DirectThemeToggle';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 
 const { width, height } = Dimensions.get('window');
+const isTablet = width >= 768;
+const contentMaxWidth = isTablet ? 700 : undefined;
 
 export default function HomeScreen() {
+  // Fallback: If user is null, redirect to login (extra safety)
+  useEffect(() => {
+    if (!user) {
+      router.replace('/login');
+    }
+  }, [user, router]);
+
   const { user, signOut } = useAuth();
   const { theme, isDarkMode, animatedColors } = useTheme();
-  
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  useNoStuckLoading(isLoading, setIsLoading);
   const [showDevMenu, setShowDevMenu] = useState(false);
   const [hasAnimated, setHasAnimated] = useState(false);
-  
-  // Create animation values
-  const entranceAnim = useRef(new Animated.Value(0)).current;
-  const cardAnimValues = useRef([0, 1, 2, 3].map(() => new Animated.Value(0))).current;
-  
+  const entranceAnim = useRef(new Animated.Value(0.95)).current;
+  const cardAnimValues = useRef([0, 1, 2, 3].map(() => new Animated.Value(0.95))).current;
+
+  // ENFORCE T&C AND PASSWORD CHANGE FOR FIRST LOGIN USERS
+  useEffect(() => {
+    // Only run if user is logged in
+    if (!user) return;
+    let isMounted = true;
+    const checkFirstTimeEnforcement = async () => {
+      try {
+        // 1. Check T&C acceptance
+        const { data: termsData, error: termsError } = await require('../lib/supabase').supabase
+          .from('terms_acceptance')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('user_type', 'resident')
+          .order('accepted_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (termsError || !termsData) {
+          if (isMounted) router.replace('/login'); // force re-login to trigger T&C modal
+          return;
+        }
+
+        // 2. Check password changed flag
+        if (!user.user_metadata?.password_changed) {
+          if (isMounted) router.replace('/change-password?first_login=true');
+          return;
+        }
+        // If both are satisfied, do nothing (allow dashboard)
+      } catch (err) {
+        // fallback: do nothing, allow dashboard
+        console.error('First login enforcement error:', err);
+      }
+    };
+    checkFirstTimeEnforcement();
+    return () => { isMounted = false; };
+  }, [user, router]);
+
   // Run entrance animation once when component mounts
   useEffect(() => {
     if (!hasAnimated) {
       setHasAnimated(true);
-      
-      // Main fade-in animation
       Animated.timing(entranceAnim, {
         toValue: 1,
         duration: 600,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }).start();
-      
-      // Staggered animations for cards
       Animated.stagger(100, 
         cardAnimValues.map(anim => 
           Animated.spring(anim, {
@@ -589,8 +630,8 @@ const styles = StyleSheet.create({
     paddingRight: 20,
   },
   featureCard: {
-    width: 260,
-    height: 160,
+    width: Math.min(260, width * 0.65),
+    height: Math.min(160, width * 0.38),
     marginRight: 15,
     borderRadius: 16,
     overflow: 'hidden',
@@ -608,7 +649,7 @@ const styles = StyleSheet.create({
   },
   featureCardOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.15)',
     padding: 16,
     justifyContent: 'space-between',
   },

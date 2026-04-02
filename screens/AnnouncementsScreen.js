@@ -19,6 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppLayout from '../components/AppLayout';
 
+
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 const AnnouncementsScreen = () => {
   const { announcementId } = useLocalSearchParams();
   const { theme, isDarkMode } = useTheme();
@@ -26,8 +28,10 @@ const AnnouncementsScreen = () => {
   const [announcements, setAnnouncements] = useState([]);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  useNoStuckLoading(isLoading, setIsLoading);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const hasLoadedOnceRef = useRef(false);
   
   // Keep track of the latest announcement ID to detect new ones
   const latestAnnouncementRef = useRef(null);
@@ -37,8 +41,8 @@ const AnnouncementsScreen = () => {
   const pollingTimerRef = useRef(null);
   
   // Animation values
-  const fadeAnim = useState(new Animated.Value(0))[0];
-  const translateY = useState(new Animated.Value(20))[0];
+  const fadeAnim = useState(new Animated.Value(0.95))[0];
+  const translateY = useState(new Animated.Value(10))[0];
   
   const startAnimation = () => {
     Animated.parallel([
@@ -97,12 +101,19 @@ const AnnouncementsScreen = () => {
     }
   };
   
-  const fetchAnnouncements = async () => {
+  const fetchAnnouncements = async (isRefresh = false) => {
     try {
+      setError(null);
       if (!residentData?.society_id) {
         console.log('No society ID found in resident data');
-        setAnnouncements([]);
-        setError('Unable to fetch announcements. No society information found.');
+        // Don't set empty array or error when residentData isn't ready yet - wait for it
+        if (residentData !== null && residentData !== undefined) {
+          setAnnouncements([]);
+        }
+        if (!isRefresh) {
+          setIsLoading(false);
+        }
+        setIsRefreshing(false);
         return;
       }
       
@@ -188,8 +199,15 @@ const AnnouncementsScreen = () => {
   // This effect runs when the screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      setIsLoading(true);
-      fetchAnnouncements().finally(() => setIsLoading(false));
+      if (!residentData?.society_id) return;
+      const shouldShowLoader = !hasLoadedOnceRef.current;
+      if (shouldShowLoader) {
+        setIsLoading(true);
+      }
+      fetchAnnouncements(false).finally(() => {
+        setIsLoading(false);
+        hasLoadedOnceRef.current = true;
+      });
       
       // Set up polling for new announcements
       pollingTimerRef.current = setInterval(pollForNewAnnouncements, POLL_INTERVAL);
@@ -205,7 +223,7 @@ const AnnouncementsScreen = () => {
   
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await fetchAnnouncements();
+    await fetchAnnouncements(true);
     setIsRefreshing(false);
   };
   
@@ -297,7 +315,7 @@ const AnnouncementsScreen = () => {
 
   // Content to render inside the AppLayout
   const renderContent = () => {
-    if (isLoading) {
+    if (isLoading && !isRefreshing) {
       return (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={isDarkMode ? theme.primaryDark || theme.primary : theme.primary} />
@@ -366,6 +384,9 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 16,
     paddingBottom: 24,
+    maxWidth: 720,
+    width: '100%',
+    alignSelf: 'center',
   },
   announcementItem: {
     borderRadius: 12,

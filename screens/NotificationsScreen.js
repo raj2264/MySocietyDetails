@@ -19,6 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AppLayout, { NOTIFICATION_COUNT_CHANGED } from '../components/AppLayout';
 import { EventRegister } from 'react-native-event-listeners';
 import { useRouter } from 'expo-router';
+
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 import { 
   fetchNotifications, 
   markNotificationAsRead, 
@@ -33,12 +35,14 @@ const NotificationsScreen = () => {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  useNoStuckLoading(isLoading, setIsLoading);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const hasLoadedOnceRef = useRef(false);
   
   // Animation values
-  const fadeAnim = useState(new Animated.Value(0))[0];
-  const translateY = useState(new Animated.Value(20))[0];
+  const fadeAnim = useState(new Animated.Value(0.95))[0];
+  const translateY = useState(new Animated.Value(10))[0];
   
   // Create a map of refs for swipeable items
   const swipeableRefs = useRef(new Map()).current;
@@ -90,15 +94,14 @@ const NotificationsScreen = () => {
     }
   };
   
-  const loadNotifications = async () => {
+  const loadNotifications = async (isRefresh = false) => {
     try {
       if (!user?.id) {
         console.log('No user ID found');
-        setNotifications([]);
-        setError('Please log in to view notifications');
         return;
       }
       
+      setError(null);
       const { data, error } = await fetchNotifications(user.id);
       
       if (error) {
@@ -118,8 +121,16 @@ const NotificationsScreen = () => {
   
   useFocusEffect(
     useCallback(() => {
-      setIsLoading(true);
-      loadNotifications().finally(() => setIsLoading(false));
+      if (!user?.id) return;
+      const shouldShowLoader = !hasLoadedOnceRef.current;
+      if (shouldShowLoader) {
+        setIsLoading(true);
+      }
+
+      loadNotifications(false).finally(() => {
+        setIsLoading(false);
+        hasLoadedOnceRef.current = true;
+      });
       
       return () => {
         // Cleanup if needed
@@ -129,7 +140,7 @@ const NotificationsScreen = () => {
   
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await loadNotifications();
+    await loadNotifications(true);
     setIsRefreshing(false);
   };
   
@@ -630,6 +641,9 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 16,
     paddingBottom: 24,
+    maxWidth: 720,
+    width: '100%',
+    alignSelf: 'center',
   },
   notificationItem: {
     borderRadius: 12,

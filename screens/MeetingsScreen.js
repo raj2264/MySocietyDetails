@@ -27,11 +27,13 @@ import AppLayout from '../components/AppLayout';
 import { useTheme } from '../context/ThemeContext';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 
 const MeetingsScreen = () => {
   const [meetings, setMeetings] = useState([]);
   const [sectionedMeetings, setSectionedMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
+  useNoStuckLoading(loading, setLoading);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
   const [minutesModalVisible, setMinutesModalVisible] = useState(false);
@@ -39,6 +41,7 @@ const MeetingsScreen = () => {
   const [activeTab, setActiveTab] = useState('committee'); // Changed default to 'committee'
   const [activeFilter, setActiveFilter] = useState('all'); // 'all', 'upcoming', 'past'
   const [forceRefresh, setForceRefresh] = useState(0); // Counter to force re-renders
+  const hasLoadedOnceRef = useRef(false);
   const tabIndicator = React.useRef(new Animated.Value(0)).current;
   const sectionListRef = useRef(null);
   const { session } = useAuth();
@@ -65,7 +68,12 @@ const MeetingsScreen = () => {
 
   const fetchSocietyId = async () => {
     try {
-      if (!session?.user?.id) return;
+      if (!session?.user?.id) {
+        setSocietyId(null);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
 
       const { data, error } = await supabase
         .from('residents')
@@ -84,11 +92,21 @@ const MeetingsScreen = () => {
     }
   };
 
-  const fetchMeetings = async () => {
+  const fetchMeetings = async (showLoader = true) => {
     try {
-      if (!societyId) return;
+      if (!societyId) {
+        setMeetings([]);
+        setSectionedMeetings([]);
+        if (showLoader) {
+          setLoading(false);
+        }
+        setRefreshing(false);
+        return;
+      }
 
-      setLoading(true);
+      if (showLoader) {
+        setLoading(true);
+      }
       // First, let's get the meetings
       const { data: meetingsData, error: meetingsError } = await supabase
         .from('meetings')
@@ -173,7 +191,9 @@ const MeetingsScreen = () => {
     } catch (error) {
       console.error('Error fetching meetings:', error);
     } finally {
-      setLoading(false);
+      if (showLoader) {
+        setLoading(false);
+      }
       setRefreshing(false);
     }
   };
@@ -368,14 +388,17 @@ const MeetingsScreen = () => {
   useFocusEffect(
     useCallback(() => {
       if (societyId) {
-        fetchMeetings();
+        const shouldShowLoader = !hasLoadedOnceRef.current;
+        fetchMeetings(shouldShowLoader).finally(() => {
+          hasLoadedOnceRef.current = true;
+        });
       }
     }, [societyId])
   );
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchMeetings();
+    fetchMeetings(false);
   };
 
   const handleMeetingPress = (meeting) => {

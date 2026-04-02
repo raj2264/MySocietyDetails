@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -18,16 +18,20 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import TermsAcceptanceHistory from '../components/TermsAcceptanceHistory';
 
+
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 const RESIDENT_STORAGE_KEY = 'resident_data';
 
 export default function ProfileScreen() {
-  const [residentData, setResidentData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  
   const { theme, isDarkMode, toggleTheme } = useTheme();
   const router = useRouter();
-  const { signOut } = useAuth();
+  const { signOut, residentData: authResidentData } = useAuth();
+
+  // Initialize with cached data from AuthContext to avoid spinner
+  const [residentData, setResidentData] = useState(authResidentData || null);
+  const [loading, setLoading] = useState(!authResidentData);
+  useNoStuckLoading(loading, setLoading);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
   useEffect(() => {
     console.log('ProfileScreen mounted');

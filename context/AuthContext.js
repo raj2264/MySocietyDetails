@@ -17,6 +17,7 @@ const AuthContext = createContext({});
 // Key for storing resident data in AsyncStorage
 const RESIDENT_STORAGE_KEY = 'resident_data';
 const SESSION_STORAGE_KEY = 'supabase_session';
+const AUTH_LOADING_MAX_MS = 4000;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -25,6 +26,8 @@ export const AuthProvider = ({ children }) => {
   const [residentData, setResidentData] = useState(null);
   const [appState, setAppState] = useState(AppState.currentState);
   const splashHidden = useRef(false);
+  // Track whether the user explicitly signed out (vs Supabase internal token events)
+  const userInitiatedSignOut = useRef(false);
 
   // Store session in AsyncStorage
   const storeSession = async (session) => {
@@ -77,12 +80,12 @@ export const AuthProvider = ({ children }) => {
   // Enhanced session restoration function
   const restoreSession = async () => {
     try {
-      console.log('AuthContext: Attempting to restore session...');
+      // console.log('AuthContext: Attempting to restore session...');
       
       // First try to get the stored session
       const storedSession = await getStoredSession();
       if (storedSession?.access_token) {
-        console.log('AuthContext: Found stored session, attempting to refresh');
+        // console.log('AuthContext: Found stored session, attempting to refresh');
         
         // Try to refresh the session
         const { data: { session: refreshedSession }, error: refreshError } = 
@@ -92,7 +95,7 @@ export const AuthProvider = ({ children }) => {
           });
 
         if (!refreshError && refreshedSession) {
-          console.log('AuthContext: Session refreshed successfully');
+          // console.log('AuthContext: Session refreshed successfully');
           setSession(refreshedSession);
           setUser(refreshedSession.user);
           await storeSession(refreshedSession);
@@ -108,7 +111,7 @@ export const AuthProvider = ({ children }) => {
       const { data: { session: currentSession }, error } = await supabase.auth.getSession();
       
       if (!error && currentSession) {
-        console.log('AuthContext: Found current session');
+        // console.log('AuthContext: Found current session');
         setSession(currentSession);
         setUser(currentSession.user);
         await storeSession(currentSession);
@@ -119,7 +122,7 @@ export const AuthProvider = ({ children }) => {
         return true;
       }
 
-      console.log('AuthContext: No valid session found');
+      // console.log('AuthContext: No valid session found');
       return false;
     } catch (error) {
       console.error('AuthContext: Error restoring session:', error);
@@ -131,7 +134,7 @@ export const AuthProvider = ({ children }) => {
   // Silently validates/refreshes the token and updates resident data from the server.
   const refreshSessionInBackground = async (cachedSession) => {
     try {
-      console.log('AuthContext: Background refresh starting...');
+      // console.log('AuthContext: Background refresh starting...');
       
       // Try to refresh/validate the session with the server
       const { data: { session: refreshedSession }, error: refreshError } = 
@@ -153,13 +156,9 @@ export const AuthProvider = ({ children }) => {
             refreshResidentData(currentSession.user.id);
           }
         } else {
-          // Session truly expired — clear state, user will be redirected to login
-          console.log('AuthContext: Session expired, clearing state');
-          setSession(null);
-          setUser(null);
-          setResidentData(null);
-          await storeSession(null);
-          await storeResidentData(null);
+          // Keep existing cached state on transient foreground/network failures.
+          // This avoids app-wide loading loops when returning from external viewers.
+          console.warn('AuthContext: Background refresh failed; keeping existing session state');
         }
         return;
       }
@@ -174,7 +173,7 @@ export const AuthProvider = ({ children }) => {
         refreshResidentData(refreshedSession.user.id);
       }
       
-      console.log('AuthContext: Background refresh complete');
+      // console.log('AuthContext: Background refresh complete');
     } catch (error) {
       console.error('AuthContext: Background refresh error:', error);
       // Don't clear state on background error — keep using cached data
@@ -185,8 +184,17 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', async (nextAppState) => {
       if (appState.match(/inactive|background/) && nextAppState === 'active') {
-        console.log('AuthContext: App has come to the foreground');
-        await restoreSession();
+        // console.log('AuthContext: App has come to the foreground');
+        // If we already have a valid session + user, do NOTHING.
+        // Sharing dialogs, PDF viewers, and other native overlays briefly
+        // background the app. Calling setSession/setUser/refreshResidentData
+        // here creates new state objects that cascade re-renders to every
+        // screen, causing infinite spinners and app-wide breakage.
+        if (!session?.access_token) {
+          // No session at all — must restore from storage/network
+          await restoreSession();
+        }
+        // Otherwise: session exists, tokens are fine, do nothing.
       }
       setAppState(nextAppState);
     });
@@ -194,7 +202,7 @@ export const AuthProvider = ({ children }) => {
     return () => {
       subscription.remove();
     };
-  }, [appState]);
+  }, [appState, session]);
 
   // Hide splash screen once loading is done
   useEffect(() => {
@@ -204,6 +212,43 @@ export const AuthProvider = ({ children }) => {
     }
   }, [loading]);
 
+  // Safety net: never allow global auth loading to spin forever.
+  useEffect(() => {
+    if (!loading) return;
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, AUTH_LOADING_MAX_MS);
+
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  // If a valid auth user exists but resident data is missing (common after app relaunch
+  // or when auth events race with route transitions), recover resident data in background.
+  useEffect(() => {
+    if (!user?.id || residentData?.id) return;
+
+    let cancelled = false;
+
+    const recoverResidentData = async () => {
+      try {
+        const refreshed = await refreshResidentData(user.id);
+        if (!refreshed && !cancelled) {
+          console.warn('AuthContext: Resident data not found during background recovery');
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('AuthContext: Failed to recover resident data:', error);
+        }
+      }
+    };
+
+    recoverResidentData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, residentData?.id]);
+
   // Load user and session on mount — CACHE-FIRST strategy
   // 1. Instantly load cached session + resident data from AsyncStorage (no network)
   // 2. Set loading=false so the UI renders immediately
@@ -211,8 +256,6 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        setLoading(true);
-
         // PHASE 1: Instant load from cache (no network)
         const [storedSession, storedResident] = await Promise.all([
           getStoredSession(),
@@ -220,7 +263,7 @@ export const AuthProvider = ({ children }) => {
         ]);
 
         if (storedSession?.access_token && storedSession?.user) {
-          // We have cached data — use it immediately
+          // We have cached data — use it immediately, NO loading spinner
           setSession(storedSession);
           setUser(storedSession.user);
           if (storedResident) {
@@ -232,13 +275,26 @@ export const AuthProvider = ({ children }) => {
           // PHASE 2: Background refresh (non-blocking)
           refreshSessionInBackground(storedSession);
         } else {
-          // No cached session — must do network restore
-          await restoreSession();
+          // No cached session — show loading briefly while we check network
+          setLoading(true);
+          const restored = await restoreSession();
           setLoading(false);
+          // If restoreSession fails, ensure user/session are null
+          if (!restored) {
+            setSession(null);
+            setUser(null);
+            setResidentData(null);
+          }
         }
       } catch (error) {
         console.error('AuthContext: Error initializing auth:', error);
         setLoading(false);
+        // Don't clear state on error if we already have cached data
+        if (!session && !user) {
+          setSession(null);
+          setUser(null);
+          setResidentData(null);
+        }
       }
     };
 
@@ -248,34 +304,49 @@ export const AuthProvider = ({ children }) => {
   // Set up auth state change listener
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log('AuthContext: Auth state changed:', event);
+      // console.log('AuthContext: Auth state changed:', event);
       
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        console.log('AuthContext: User signed in or token refreshed');
+        // console.log('AuthContext: User signed in or token refreshed');
         setSession(currentSession);
         setUser(currentSession?.user || null);
         await storeSession(currentSession);
         
         if (currentSession?.user) {
-          // Check if user is a guard before refreshing resident data
-          const { data: guardData } = await supabase
-            .from('guards')
-            .select('id')
-            .eq('user_id', currentSession.user.id)
-            .maybeSingle();
-            
-          if (!guardData) {
-            // Only refresh resident data if user is not a guard
-            await refreshResidentData(currentSession.user.id);
+          // Skip resident data refresh if we already have it for this user.
+          // TOKEN_REFRESHED fires frequently (on every background return via setSession)
+          // and re-fetching resident data creates new objects that cascade re-renders.
+          if (residentData?.id && residentData?.user_id === currentSession.user.id) {
+            // Already have valid resident data for this user — skip
+          } else {
+            // Check if user is a guard before refreshing resident data
+            const { data: guardData } = await supabase
+              .from('guards')
+              .select('id')
+              .eq('user_id', currentSession.user.id)
+              .maybeSingle();
+              
+            if (!guardData) {
+              // Only refresh resident data if user is not a guard
+              await refreshResidentData(currentSession.user.id);
+            }
           }
         }
       } else if (event === 'SIGNED_OUT') {
-        console.log('AuthContext: User signed out');
-        setSession(null);
-        setUser(null);
-        setResidentData(null);
-        await storeSession(null);
-        await storeResidentData(null);
+        // Only clear state if the user explicitly signed out.
+        // Supabase fires SIGNED_OUT internally when token refresh fails
+        // (e.g., brief network glitch, server hiccup). Honoring that
+        // causes random logouts even though cached credentials are still valid.
+        if (userInitiatedSignOut.current) {
+          userInitiatedSignOut.current = false;
+          setSession(null);
+          setUser(null);
+          setResidentData(null);
+          await storeSession(null);
+          await storeResidentData(null);
+        } else {
+          console.warn('AuthContext: Ignoring unexpected SIGNED_OUT event (not user-initiated)');
+        }
       }
     });
 
@@ -285,12 +356,12 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const handleSignIn = async (email, password) => {
-    console.log('AuthContext: Signing in user:', email);
+    // console.log('AuthContext: Signing in user:', email);
     setLoading(true);
     
     try {
       // Use Supabase auth directly for better control
-      console.log('AuthContext: Attempting direct Supabase sign in');
+      // console.log('AuthContext: Attempting direct Supabase sign in');
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email,
         password: password
@@ -302,7 +373,7 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: error.message };
       }
       
-      console.log('AuthContext: Sign in successful for user:', data.user.id);
+      // console.log('AuthContext: Sign in successful for user:', data.user.id);
       
       // Verify this user is a resident, not a guard
       const { data: guardData } = await supabase
@@ -313,7 +384,7 @@ export const AuthProvider = ({ children }) => {
         
       if (guardData) {
         // This is a guard, not a resident. Sign them out and return error
-        console.log('AuthContext: Attempted login with guard credentials to resident app');
+        // console.log('AuthContext: Attempted login with guard credentials to resident app');
         await supabase.auth.signOut();
         setLoading(false);
         return { 
@@ -333,7 +404,7 @@ export const AuthProvider = ({ children }) => {
         console.error('AuthContext: Error fetching resident data after login:', residentError.message);
       } else if (!residentData) {
         // No resident record found
-        console.log('AuthContext: No resident record found for user after login');
+        // console.log('AuthContext: No resident record found for user after login');
         await supabase.auth.signOut();
         setLoading(false);
         return { 
@@ -342,7 +413,7 @@ export const AuthProvider = ({ children }) => {
         };
       } else {
         // Valid resident found
-        console.log('AuthContext: Resident data fetched after login:', JSON.stringify(residentData));
+        // console.log('AuthContext: Resident data fetched after login:', JSON.stringify(residentData));
         setSession(data.session);
         setUser(data.user);
         setResidentData(residentData);
@@ -360,30 +431,32 @@ export const AuthProvider = ({ children }) => {
 
   const handleSignOut = async () => {
     try {
-      setLoading(true);
-      await supabase.auth.signOut();
+      // Mark as user-initiated so onAuthStateChange honors the SIGNED_OUT event
+      userInitiatedSignOut.current = true;
+      // Clear state immediately — no global loading flag needed.
+      // Setting user to null triggers navigation to the login/welcome screen.
       setSession(null);
       setUser(null);
       setResidentData(null);
+      await supabase.auth.signOut();
       await storeSession(null);
       await storeResidentData(null);
     } catch (error) {
       console.error('Error signing out:', error);
+      userInitiatedSignOut.current = false;
       Alert.alert('Error', 'Failed to sign out');
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleResetPassword = async (email) => {
-    console.log('AuthContext: Requesting password reset for:', email);
+    // console.log('AuthContext: Requesting password reset for:', email);
     return await resetPassword(email);
   };
 
   // Update user profile and resident data
   const updateUserProfile = async (profileData) => {
     try {
-      console.log('AuthContext: Updating user profile:', profileData);
+      // console.log('AuthContext: Updating user profile:', profileData);
       
       if (!user?.id) {
         throw new Error('No authenticated user found');
@@ -441,7 +514,7 @@ export const AuthProvider = ({ children }) => {
       if (!currentUserId) {
         const { data: userData, error: userError } = await supabase.auth.getUser();
         if (userError || !userData?.user) {
-          console.log('Cannot refresh resident data: User not authenticated');
+          // console.log('Cannot refresh resident data: User not authenticated');
           return false;
         }
         currentUserId = userData.user.id;
@@ -460,7 +533,7 @@ export const AuthProvider = ({ children }) => {
       
       // If user is a guard, don't use resident data
       if (guardResult.data) {
-        console.log('User is a guard, skipping resident data');
+        // console.log('User is a guard, skipping resident data');
         return false;
       }
       
@@ -470,11 +543,21 @@ export const AuthProvider = ({ children }) => {
       }
       
       if (residentResult.data) {
-        setResidentData(residentResult.data);
+        // Only update state if the data actually changed (compare by id + updated_at)
+        // This prevents cascading re-renders across all screens when the data is identical
+        setResidentData(prev => {
+          if (prev?.id === residentResult.data.id && prev?.updated_at === residentResult.data.updated_at) {
+            return prev; // Same reference — no re-render
+          }
+          return residentResult.data;
+        });
         storeResidentData(residentResult.data);
         return true;
       } else {
-        setResidentData(null);
+        setResidentData(prev => {
+          if (prev === null) return prev;
+          return null;
+        });
         storeResidentData(null);
         return false;
       }

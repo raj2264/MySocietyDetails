@@ -14,16 +14,19 @@ import {
   Animated,
   useColorScheme,
   Dimensions,
+  Image,
   Modal
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import DirectThemeToggle from '../components/DirectThemeToggle';
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 
+
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 const { width, height } = Dimensions.get('window');
 
 // Key for storing guard data in AsyncStorage
@@ -33,6 +36,7 @@ export default function GuardLoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  useNoStuckLoading(isLoading, setIsLoading);
   const [showPassword, setShowPassword] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -259,7 +263,7 @@ export default function GuardLoginScreen() {
       transparent={true}
       onRequestClose={() => setShowTerms(false)}
     >
-      <View style={[styles.modalContainer, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.9)' : 'rgba(0,0,0,0.7)' }]}>
+        <View style={[styles.modalContainer, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.9)' : 'rgba(0,0,0,0.02)' }]}>
         <View style={[styles.modalContent, { backgroundColor: isDarkMode ? theme.background : '#fff' }]}>
           <ScrollView style={styles.termsScroll}>
             <Text style={[styles.termsTitle, { color: theme.text }]}>
@@ -355,7 +359,7 @@ export default function GuardLoginScreen() {
                 { transform: [{ scale: logoScale }] }
               ]}>
                 <View style={[styles.logoCircle, { backgroundColor: theme.primary + '30' }]}>
-                  <MaterialCommunityIcons name="shield-account" size={38} color={theme.primary} />
+                  <Image source={require('../assets/images/msd-logo.jpeg')} style={styles.logoImage} />
                 </View>
                 <Text style={[styles.title, { color: theme.text }]}>Security Guard</Text>
                 <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
@@ -517,6 +521,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    overflow: 'hidden',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   title: {
     fontSize: Math.min(32, width * 0.08),

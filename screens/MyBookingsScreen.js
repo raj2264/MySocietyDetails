@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,21 +16,28 @@ import { useAuth } from '../context/AuthContext';
 import AppLayout from '../components/AppLayout';
 import { supabase } from '../lib/supabase';
 import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 
 const MyBookingsScreen = () => {
-  const { theme } = useTheme();
+  const { theme, isDarkMode } = useTheme();
   const { residentData } = useAuth();
+  const router = useRouter();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  useNoStuckLoading(loading, setLoading);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const hasLoadedOnceRef = useRef(false);
+  const isFetchingRef = useRef(false);
 
   const loadBookings = async () => {
-    if (!residentData?.id) return;
+    if (!residentData?.id) {
+      return;
+    }
     
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('service_bookings')
         .select(`
@@ -51,21 +58,37 @@ const MyBookingsScreen = () => {
     } catch (error) {
       console.error('Error loading bookings:', error);
       Alert.alert('Error', 'Failed to load bookings');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
   };
 
   useFocusEffect(
     useCallback(() => {
-      loadBookings();
+      if (!residentData?.id || isFetchingRef.current) return;
+      const shouldShowLoader = !hasLoadedOnceRef.current;
+      if (shouldShowLoader) {
+        setLoading(true);
+      }
+      isFetchingRef.current = true;
+      Promise.resolve(loadBookings())
+        .catch(error => console.error('Error in loadBookings:', error))
+        .finally(() => {
+          isFetchingRef.current = false;
+          setLoading(false);
+          hasLoadedOnceRef.current = true;
+        });
     }, [residentData?.id])
   );
 
   const handleRefresh = () => {
+    if (isFetchingRef.current) return;
     setRefreshing(true);
-    loadBookings();
+    isFetchingRef.current = true;
+    Promise.resolve(loadBookings())
+      .catch(error => console.error('Error during refresh:', error))
+      .finally(() => {
+        isFetchingRef.current = false;
+        setRefreshing(false);
+      });
   };
 
   const handleBookingPress = (booking) => {
@@ -180,7 +203,7 @@ const MyBookingsScreen = () => {
       
       <TouchableOpacity
         style={[styles.emptyButton, { backgroundColor: theme.primary }]}
-        onPress={() => navigation.navigate('Services')}
+        onPress={() => router.push('/services')}
       >
         <Text style={styles.emptyButtonText}>Browse Services</Text>
       </TouchableOpacity>
@@ -258,7 +281,7 @@ const MyBookingsScreen = () => {
           animationType="fade"
           onRequestClose={() => setShowDetailsModal(false)}
         >
-          <View style={styles.modalOverlay}>
+          <View style={[styles.modalOverlay, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.02)' }]}>
             <View style={[styles.modalContainer, { backgroundColor: theme.card }]}>
               {selectedBooking && (
                 <View style={styles.modalContent}>
@@ -474,7 +497,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },

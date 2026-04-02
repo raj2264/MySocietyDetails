@@ -170,13 +170,6 @@ export default function HomeScreen() {
   
   const features = [
     {
-      icon: 'home-outline',
-      title: 'Home',
-      description: 'Return to the main dashboard',
-      route: '/home',
-      color: '#4361EE'
-    },
-    {
       icon: 'person-outline',
       title: 'Profile',
       description: 'View and manage your profile',

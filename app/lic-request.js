@@ -16,12 +16,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 
+
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 export default function LICRequestScreen() {
   const { theme } = useTheme();
   const { user, residentData } = useAuth();
   const router = useRouter();
   
   const [loading, setLoading] = useState(false);
+  useNoStuckLoading(loading, setLoading);
   const [residentName, setResidentName] = useState('');
   const [policyNumber, setPolicyNumber] = useState('');
   const [requestType, setRequestType] = useState('');

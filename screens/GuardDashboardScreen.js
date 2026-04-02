@@ -22,6 +22,7 @@ import { supabase } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import GuardSidebar from '../components/GuardSidebar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 
 const GUARD_STORAGE_KEY = 'guard_data';
 
@@ -29,6 +30,7 @@ export default function GuardDashboardScreen() {
   const [guardData, setGuardData] = useState(null);
   const [visitors, setVisitors] = useState([]);
   const [loading, setLoading] = useState(true);
+  useNoStuckLoading(loading, setLoading);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [visitorName, setVisitorName] = useState('');
@@ -64,9 +66,9 @@ export default function GuardDashboardScreen() {
   };
 
   // Simplified animation values - using only what's necessary
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0.95)).current;
   const slideAnim = useRef(new Animated.Value(10)).current; // Reduced slide distance
-  const scaleAnim = useRef(new Animated.Value(0.98)).current; // Single scale for all content
+  const scaleAnim = useRef(new Animated.Value(0.99)).current; // Single scale for all content
 
   useEffect(() => {
     loadGuardData();
@@ -1495,7 +1497,7 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
   },
   modalContent: {
     borderTopLeftRadius: 20,
@@ -1551,7 +1553,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
     padding: 20,
   },
   codeModalContent: {
@@ -1668,7 +1670,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   formScrollContainer: {
-    height: 400,
+    maxHeight: 420,
+    flexShrink: 1,
   },
   formScrollContent: {
     paddingVertical: 10,

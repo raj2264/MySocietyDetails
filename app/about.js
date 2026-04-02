@@ -12,11 +12,11 @@ export default function AboutUs() {
   const buildNumber = appJson.expo.android.versionCode;
 
   const handleEmailPress = () => {
-    Linking.openURL('mailto:support@mysocietydetails.com');
+    Linking.openURL('mailto:mysocietydetails7@gmail.com');
   };
 
   const handlePhonePress = () => {
-    Linking.openURL('tel:+15551234567');
+    Linking.openURL('tel:+918454030860');
   };
 
   const features = [
@@ -122,7 +122,7 @@ export default function AboutUs() {
             >
               <Ionicons name="mail-outline" size={20} color={theme.primary} />
               <Text style={[styles.contactButtonText, { color: theme.primary }]}>
-                support@mysocietydetails.com
+                mysocietydetails7@gmail.com
               </Text>
             </TouchableOpacity>
             <TouchableOpacity 
@@ -132,7 +132,7 @@ export default function AboutUs() {
             >
               <Ionicons name="call-outline" size={20} color={theme.primary} />
               <Text style={[styles.contactButtonText, { color: theme.primary }]}>
-                +1 (555) 123-4567
+                +91 84540 30860
               </Text>
             </TouchableOpacity>
           </View>

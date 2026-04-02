@@ -22,12 +22,15 @@ import { format, parseISO } from 'date-fns';
 import GuardSidebar from '../components/GuardSidebar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 const GUARD_STORAGE_KEY = 'guard_data';
 
 export default function GuardVisitorsScreen() {
   const [guardData, setGuardData] = useState(null);
   const [visitors, setVisitors] = useState([]);
   const [loading, setLoading] = useState(true);
+  useNoStuckLoading(loading, setLoading);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -38,9 +41,9 @@ export default function GuardVisitorsScreen() {
   const bottomTabBarPadding = 55 + Math.max(insets.bottom, 0);
 
   // Animation values
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0.95)).current;
   const slideAnim = useRef(new Animated.Value(10)).current;
-  const scaleAnim = useRef(new Animated.Value(0.98)).current;
+  const scaleAnim = useRef(new Animated.Value(0.99)).current;
 
   useEffect(() => {
     loadGuardData();
@@ -586,6 +589,9 @@ const styles = StyleSheet.create({
   },
   visitorsListContent: {
     padding: 16,
+    maxWidth: 720,
+    width: '100%',
+    alignSelf: 'center',
   },
   emptyContainer: {
     alignItems: 'center',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,19 +15,24 @@ import { Ionicons } from '@expo/vector-icons';
 import AppLayout from '../components/AppLayout';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
+import { useFocusEffect } from '@react-navigation/native';
 
+
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 export default function EVChargingScreen() {
   const { theme, isDarkMode } = useTheme();
   const { user, residentData } = useAuth();
   const [spots, setSpots] = useState([]);
   const [loading, setLoading] = useState(true);
+  useNoStuckLoading(loading, setLoading);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const hasLoadedOnceRef = useRef(false);
 
   const fetchSpots = async () => {
     try {
       if (!residentData?.society_id) {
-        throw new Error('No society found for this resident');
+        return;
       }
 
       const { data, error } = await supabase
@@ -42,19 +47,28 @@ export default function EVChargingScreen() {
     } catch (err) {
       console.error('Error fetching charging spots:', err);
       setError(err.message);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchSpots();
-  }, [residentData?.society_id]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!residentData?.society_id) return;
+      const isSubsequentLoad = hasLoadedOnceRef.current;
+      if (!isSubsequentLoad) {
+        setLoading(true);
+      }
+      fetchSpots().finally(() => {
+        setLoading(false);
+        hasLoadedOnceRef.current = true;
+      });
+    }, [residentData?.society_id])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchSpots();
+    fetchSpots().finally(() => {
+      setRefreshing(false);
+    });
   };
 
   const getStatusColor = (status) => {

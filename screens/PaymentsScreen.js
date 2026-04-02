@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,23 +15,24 @@ import { useAuth } from '../context/AuthContext';
 import AppLayout from '../components/AppLayout';
 import { getPaymentHistory } from '../lib/payments';
 import { formatCurrency } from '../utils/formatters';
+import { useFocusEffect } from '@react-navigation/native';
 
+
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 export default function PaymentsScreen() {
   const { theme, isDarkMode } = useTheme();
   const { residentData } = useAuth();
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
+  useNoStuckLoading(loading, setLoading);
   const [refreshing, setRefreshing] = useState(false);
+  const hasLoadedOnceRef = useRef(false);
+  const isFetchingRef = useRef(false);
 
-  useEffect(() => {
-    loadPayments();
-  }, [residentData]);
-
-  const loadPayments = async () => {
+  const loadPayments = useCallback(async () => {
     try {
       if (!residentData?.id) {
         console.log('No resident data available');
-        setPayments([]);
         return;
       }
 
@@ -40,15 +41,37 @@ export default function PaymentsScreen() {
     } catch (error) {
       console.error('Error loading payments:', error);
       Alert.alert('Error', 'Failed to load payment history');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
-  };
+  }, [residentData?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!residentData?.id || isFetchingRef.current) return;
+      const shouldShowLoader = !hasLoadedOnceRef.current;
+      if (shouldShowLoader) {
+        setLoading(true);
+      }
+      isFetchingRef.current = true;
+      Promise.resolve(loadPayments())
+        .catch(error => console.error('Error in loadPayments:', error))
+        .finally(() => {
+          isFetchingRef.current = false;
+          setLoading(false);
+          hasLoadedOnceRef.current = true;
+        });
+    }, [residentData?.id])
+  );
 
   const onRefresh = () => {
+    if (isFetchingRef.current) return;
     setRefreshing(true);
-    loadPayments();
+    isFetchingRef.current = true;
+    Promise.resolve(loadPayments())
+      .catch(error => console.error('Error during refresh:', error))
+      .finally(() => {
+        isFetchingRef.current = false;
+        setRefreshing(false);
+      });
   };
 
   const getStatusColor = (status) => {
@@ -137,7 +160,7 @@ export default function PaymentsScreen() {
     </View>
   );
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <AppLayout title="Payments">
         <View style={styles.loadingContainer}>

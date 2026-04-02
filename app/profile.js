@@ -19,6 +19,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import TermsAcceptanceHistory from '../components/TermsAcceptanceHistory';
 
+
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 export default function ProfileScreen() {
   const { theme, isDarkMode } = useTheme();
   const { user, updateUserProfile, residentData } = useAuth();
@@ -27,11 +29,25 @@ export default function ProfileScreen() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  useNoStuckLoading(isLoading, setIsLoading);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [profileImage, setProfileImage] = useState(
-    user?.user_metadata?.avatar_url || defaultAvatarUrl
+    residentData?.avatar_url || user?.user_metadata?.avatar_url || defaultAvatarUrl
   );
   const [imageLoadError, setImageLoadError] = useState(false);
+  const [imageRefreshKey, setImageRefreshKey] = useState(0);
+
+  // Effect to update profile image when residentData changes
+  useEffect(() => {
+    if (residentData?.avatar_url) {
+      // Add cache buster to force fresh image load
+      const urlWithBuster = residentData.avatar_url.includes('?t=')
+        ? residentData.avatar_url
+        : `${residentData.avatar_url}?t=${Date.now()}`;
+      setProfileImage(urlWithBuster);
+      setImageLoadError(false);
+    }
+  }, [residentData?.avatar_url]);
 
   // Form fields
   const [fullName, setFullName] = useState('');
@@ -69,10 +85,7 @@ export default function ProfileScreen() {
       setApartmentNo(user?.user_metadata?.apartment_no || '');
       setEmergencyContact(user?.user_metadata?.emergency_contact || '');
     }
-
-    const latestAvatar = user?.user_metadata?.avatar_url || defaultAvatarUrl;
-    setProfileImage(latestAvatar);
-    setImageLoadError(false);
+    // Avatar URL is updated in separate effect below, don't override it here
   }, [residentData, user]);
 
   // Helper to pick image from gallery
@@ -97,26 +110,97 @@ export default function ProfileScreen() {
     }
   };
 
+  // Remove profile photo
+  const removeProfilePhoto = () => {
+    Alert.alert(
+      'Remove Photo',
+      'Are you sure you want to remove your profile photo?',
+      [
+        { text: 'Cancel', onPress: () => {}, style: 'cancel' },
+        {
+          text: 'Remove',
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              // Remove from database immediately
+              const { success, error } = await updateUserProfile({ avatar_url: null });
+              if (success) {
+                setProfileImage(defaultAvatarUrl);
+                setImageLoadError(false);
+                Alert.alert('Success', 'Profile photo removed successfully');
+              } else {
+                Alert.alert('Error', 'Failed to remove photo: ' + error);
+              }
+            } catch (err) {
+              Alert.alert('Error', err.message || 'Failed to remove photo');
+            } finally {
+              setIsLoading(false);
+            }
+          },
+          style: 'destructive',
+        },
+      ]
+    );
+  };
+
   // Upload avatar to Supabase Storage and return public URL
   const uploadAvatarToStorage = async (localUri) => {
-    const ext = (localUri.split('.').pop().split('?')[0] || 'jpg').toLowerCase();
-    const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
-    const fileName = `${user.id}/avatar.${ext}`;
+    try {
+      if (!user?.id) throw new Error('User not authenticated');
 
-    const response = await fetch(localUri);
-    const blob = await response.blob();
+      let ext = 'jpg';
+      if (localUri.includes('.png')) ext = 'png';
+      else if (localUri.includes('.webp')) ext = 'webp';
 
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(fileName, blob, { contentType: mimeType, upsert: true });
+      const fileName = `${user.id}/avatar_${Date.now()}.${ext}`;
 
-    if (uploadError) throw uploadError;
+      // Prepare file data
+      let fileData;
+      if (localUri.startsWith('data:')) {
+        const response = await fetch(localUri);
+        fileData = await response.arrayBuffer();
+      } else {
+        const response = await fetch(localUri);
+        fileData = await response.arrayBuffer();
+      }
 
-    const { data: publicData } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(fileName);
+      // Upload to storage
+      const { error, data } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, fileData, {
+          contentType: `image/${ext}`,
+          upsert: true,
+        });
 
-    return publicData.publicUrl;
+      if (error) {
+        console.error('Supabase upload error:', error);
+        throw new Error(`Supabase error: ${error.message}`);
+      }
+
+      console.log('Avatar uploaded:', fileName);
+
+      // Get public URL - properly formatted
+      const { data: publicUrlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      const publicUrl = publicUrlData?.publicUrl;
+      console.log('Avatar public URL:', publicUrl);
+
+      if (!publicUrl) {
+        throw new Error('Failed to get public URL');
+      }
+
+      // Add cache buster with random string to force fresh load
+      const cacheBuster = `v=${Math.random().toString(36).substr(2, 9)}`;
+      const urlWithBuster = publicUrl.includes('?')
+        ? `${publicUrl}&${cacheBuster}`
+        : `${publicUrl}?${cacheBuster}`;
+      return urlWithBuster;
+    } catch (error) {
+      console.error('Avatar upload error:', error);
+      throw error;
+    }
   };
 
   // Handle form submission
@@ -124,11 +208,31 @@ export default function ProfileScreen() {
     setIsLoading(true);
     
     try {
-      // Upload avatar to Supabase Storage if it's a local file
+      // Handle avatar: upload new, keep existing, or clear if removed
       let avatarUrl = profileImage;
-      if (profileImage && !profileImage.startsWith('http')) {
-        avatarUrl = await uploadAvatarToStorage(profileImage);
-        setProfileImage(avatarUrl);
+      
+      // If user removed the photo (back to default), clear it
+      if (profileImage === defaultAvatarUrl) {
+        avatarUrl = null;
+        setProfileImage(defaultAvatarUrl);
+        setImageLoadError(false);
+        setImageRefreshKey(prev => prev + 1);
+      }
+      // If it's a new local file, upload it
+      else if (profileImage && !profileImage.startsWith('http')) {
+        let uploadedUrl = null;
+        try {
+          uploadedUrl = await uploadAvatarToStorage(profileImage);
+          // Set immediately with the new URL and force component refresh
+          setProfileImage(uploadedUrl);
+          setImageLoadError(false);
+          setImageRefreshKey(prev => prev + 1);
+          avatarUrl = uploadedUrl;
+        } catch (uploadErr) {
+          console.warn('Avatar upload warning:', uploadErr.message);
+          Alert.alert('Note', 'Profile will be saved but photo upload failed. Please check your connection.');
+          return;
+        }
       }
 
       // Prepare profile data
@@ -137,8 +241,15 @@ export default function ProfileScreen() {
         phone,
         apartment_no: apartmentNo,
         emergency_contact: emergencyContact,
-        avatar_url: avatarUrl,
       };
+      
+      // Only add avatar URL if we have one (null clears it)
+      if (avatarUrl !== null && avatarUrl && avatarUrl.startsWith('http')) {
+        updatedProfile.avatar_url = avatarUrl;
+      } else if (avatarUrl === null) {
+        // Explicitly set to null to clear avatar
+        updatedProfile.avatar_url = null;
+      }
       
       // Update profile in Supabase
       const { success, error } = await updateUserProfile(updatedProfile);
@@ -148,11 +259,16 @@ export default function ProfileScreen() {
         return;
       }
 
-      Alert.alert('Success', 'Profile updated successfully');
-      setIsEditing(false);
+      // Show success and close edit mode
+      Alert.alert('Success', 'Profile updated successfully', [
+        {
+          text: 'OK',
+          onPress: () => setIsEditing(false),
+        },
+      ]);
     } catch (error) {
       console.error('Error saving profile:', error);
-      Alert.alert('Error', 'An unexpected error occurred');
+      Alert.alert('Error', error.message || 'An unexpected error occurred while saving profile');
     } finally {
       setIsLoading(false);
     }
@@ -350,6 +466,7 @@ export default function ProfileScreen() {
           <View style={styles.profileImageContainer}>
             {profileImage && !imageLoadError ? (
               <Image
+                key={`${profileImage}-${imageRefreshKey}`}
                 source={{ uri: profileImage }}
                 style={styles.profileImage}
                 onError={() => setImageLoadError(true)}
@@ -361,12 +478,20 @@ export default function ProfileScreen() {
             )}
             
             {isEditing && (
-              <TouchableOpacity 
-                style={[styles.changePhotoButton, { backgroundColor: theme.primary }]}
-                onPress={pickImage}
-              >
-                <Ionicons name="camera-outline" size={22} color="#FFF" />
-              </TouchableOpacity>
+              <View style={styles.photoButtonsContainer}>
+                <TouchableOpacity 
+                  style={[styles.changePhotoButton, { backgroundColor: theme.primary }]}
+                  onPress={pickImage}
+                >
+                  <Ionicons name="camera-outline" size={22} color="#FFF" />
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.removePhotoButton, { backgroundColor: theme.error }]}
+                  onPress={removeProfilePhoto}
+                >
+                  <Ionicons name="trash-outline" size={22} color="#FFF" />
+                </TouchableOpacity>
+              </View>
             )}
           </View>
           
@@ -684,11 +809,15 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     alignItems: 'center',
-    padding: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
   },
   profileImageContainer: {
     position: 'relative',
-    marginBottom: 16,
+    marginBottom: 8,
+    minHeight: 160,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   profileImage: {
     width: 100,
@@ -702,19 +831,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  changePhotoButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  photoButtonsContainer: {
+    flexDirection: 'row',
+    gap: 16,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 16,
+    paddingHorizontal: 16,
+  },
+  changePhotoButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  removePhotoButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 5,
   },
   profileName: {
     fontSize: 22,
     fontWeight: 'bold',
+    marginTop: 4,
   },
   profileRole: {
     fontSize: 16,
@@ -726,6 +878,9 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: 16,
     marginBottom: 20,
+    maxWidth: 680,
+    width: '100%',
+    alignSelf: 'center',
   },
   sectionTitle: {
     fontSize: 18,

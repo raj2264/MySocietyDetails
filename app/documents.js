@@ -10,11 +10,13 @@ import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { openFileLocally } from '../utils/file-opener';
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 
 export default function Documents() {
   const { theme, isDarkMode } = useTheme();
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
+  useNoStuckLoading(loading, setLoading);
   const [refreshing, setRefreshing] = useState(false);
   const [downloading, setDownloading] = useState({});
   const [sharing, setSharing] = useState({});
@@ -36,9 +38,9 @@ export default function Documents() {
     })();
   }, []);
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = async (showLoader = true) => {
     try {
-      setLoading(true);
+      if (showLoader) setLoading(true);
       const { data, error } = await supabase
         .from('essential_documents')
         .select('*')
@@ -50,13 +52,13 @@ export default function Documents() {
       console.error('Error fetching documents:', error);
       Alert.alert('Error', 'Failed to fetch documents');
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchDocuments();
+    await fetchDocuments(false);
     setRefreshing(false);
   };
 

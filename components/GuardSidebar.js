@@ -200,12 +200,19 @@ export default function GuardSidebar({ visible, onClose, guardData }) {
         <View style={styles.header}>
           <View style={styles.logoContainer}>
             <View style={[styles.logoBackground, { backgroundColor: theme.primary + '15' }]}>
-              <Ionicons name="shield" size={28} color={theme.primary} />
+              <Image source={require('../assets/images/msd-logo.jpeg')} style={styles.logoImage} />
             </View>
             <Text style={[styles.logoText, { color: theme.text }]}>Guard Portal</Text>
           </View>
           
-          <View style={styles.userInfoContainer}>
+          <TouchableOpacity 
+            style={styles.userInfoContainer}
+            onPress={() => {
+              router.push('/guard-profile');
+              onClose();
+            }}
+            activeOpacity={0.7}
+          >
             <View style={[styles.avatarContainer, { backgroundColor: theme.primary + '15' }]}>
               <Ionicons name="person" size={28} color={theme.primary} />
             </View>
@@ -217,7 +224,7 @@ export default function GuardSidebar({ visible, onClose, guardData }) {
                 Security Guard
               </Text>
             </View>
-          </View>
+          </TouchableOpacity>
         </View>
         
         <View style={[styles.themeToggleContainer, { borderBottomColor: theme.border }]}>
@@ -354,6 +361,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
+    overflow: 'hidden',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   logoText: {
     fontSize: 22,

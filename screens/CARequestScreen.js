@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import { Card } from '../components/ui/Card';
 import { Ionicons } from '@expo/vector-icons';
 import AppLayout from '../components/AppLayout';
 import { useFocusEffect } from '@react-navigation/native';
+import useNoStuckLoading from '../hooks/useNoStuckLoading';
 
 export default function CARequestScreen() {
   const { user, residentData } = useAuth();
@@ -28,8 +29,10 @@ export default function CARequestScreen() {
   const { theme, isDarkMode } = useTheme();
   const [activeTab, setActiveTab] = useState('new');
   const [loading, setLoading] = useState(false);
+  useNoStuckLoading(loading, setLoading);
   const [requestsLoading, setRequestsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const hasLoadedOnceRef = useRef(false);
   const [myRequests, setMyRequests] = useState([]);
   const [formData, setFormData] = useState({
     requestType: '',
@@ -41,7 +44,9 @@ export default function CARequestScreen() {
 
   // Fetch user's CA requests
   const fetchMyRequests = useCallback(async () => {
-    if (!residentData?.id) return;
+    if (!residentData?.id) {
+      return;
+    }
     
     try {
       const { data, error } = await supabase
@@ -64,8 +69,15 @@ export default function CARequestScreen() {
   // Fetch requests when screen is focused
   useFocusEffect(
     useCallback(() => {
-      setRequestsLoading(true);
-      fetchMyRequests();
+      if (!residentData?.id) return;
+      const shouldShowLoader = !hasLoadedOnceRef.current;
+      if (shouldShowLoader) {
+        setRequestsLoading(true);
+      }
+      fetchMyRequests().finally(() => {
+        setRequestsLoading(false);
+        hasLoadedOnceRef.current = true;
+      });
     }, [fetchMyRequests])
   );
 
