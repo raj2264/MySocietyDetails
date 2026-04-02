@@ -20,22 +20,15 @@ config.resolver.extraNodeModules = {
   '@supabase/realtime-js': path.resolve(__dirname, './lib/realtime-mock.js')
 };
 
-// Add resolver to prevent node modules from being bundled
-config.resolver.blacklistRE = [
+// Block nested node modules from being bundled
+config.resolver.blockList = [
   /\/node_modules\/.*\/node_modules\/crypto\/.*/,
   /\/node_modules\/.*\/node_modules\/http\/.*/,
   /\/node_modules\/.*\/node_modules\/zlib\/.*/,
   /\/node_modules\/.*\/node_modules\/net\/.*/,
   /\/node_modules\/ws\/.*/,
-  // Block any websocket modules
   /\/node_modules\/.*websocket.*/,
   /\/node_modules\/@supabase\/realtime-js\/.*/,
-];
-
-// Don't try to resolve these node modules
-config.resolver.blockList = [
-  /\/node_modules\/ws\/.*/, 
-  /\/node_modules\/@supabase\/realtime-js\/.*/
 ];
 
 // Configure resolver to prioritize our mocks
