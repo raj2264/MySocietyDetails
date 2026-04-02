@@ -5,15 +5,13 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "node": "24.4.0"
+      "distribution": "internal"
     },
     "preview": {
       "android": {
         "buildType": "apk"
       },
-      "distribution": "internal",
-      "node": "24.4.0"
+      "distribution": "internal"
     },
     "production": {
       "android": {
@@ -21,8 +19,7 @@
       },
       "ios": {
         "image": "latest"
-      },
-      "node": "24.4.0"
+      }
     }
   },
   "submit": {
