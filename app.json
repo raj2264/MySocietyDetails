@@ -3,6 +3,9 @@
     "name": "My Society Details",
     "slug": "my-society-details",
     "version": "1.0.0",
+    "cli": {
+      "appVersionSource": "local"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
