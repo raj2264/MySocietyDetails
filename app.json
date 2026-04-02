@@ -1,18 +1,19 @@
 {
   "expo": {
-    "name": "My Society Details",
+    "owner": "pratham886",
+    "name": "My Society Details Closed Testing",
     "slug": "my-society-details",
-    "version": "1.0.0",
+    "version": "1.0.7",
     "cli": {
       "appVersionSource": "local"
     },
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/images/msd-logo.jpeg",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "scheme": "mysocietydetails",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/images/msd-logo.jpeg",
       "resizeMode": "contain",
       "backgroundColor": "#121212"
     },
@@ -24,12 +25,13 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/images/msd-logo.jpeg",
         "backgroundColor": "#121212"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.anonymous.MySocietyApp",
       "softwareKeyboardLayoutMode": "pan",
+      "versionCode": 7,
       "permissions": [
         "CAMERA"
       ]
@@ -43,19 +45,16 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/images/msd-logo.jpeg",
           "color": "#4361EE"
         }
       ]
     ],
     "entryPoint": "./index.js",
-    "permissions": [
-      "CAMERA"
-    ],
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "ce661c8b-185a-41ef-b05e-21173e136109"
+        "projectId": "f7b560ee-e144-48b9-bf3c-12ac00aec9cc"
       }
     }
   }

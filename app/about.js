@@ -3,10 +3,13 @@ import { View, Text, StyleSheet, ScrollView, Image, useWindowDimensions, Linking
 import { useTheme } from '../context/ThemeContext';
 import AppLayout from '../components/AppLayout';
 import { Ionicons } from '@expo/vector-icons';
+import appJson from '../app.json';
 
 export default function AboutUs() {
   const { theme, isDarkMode } = useTheme();
   const { width } = useWindowDimensions();
+  const appVersion = appJson.expo.version;
+  const buildNumber = appJson.expo.android.versionCode;
 
   const handleEmailPress = () => {
     Linking.openURL('mailto:support@mysocietydetails.com');
@@ -55,7 +58,7 @@ export default function AboutUs() {
             Making Society Living Better
           </Text>
           <Text style={[styles.version, { color: theme.text + '99' }]}>
-            Version 1.0.0
+            Version {appVersion} (Build {buildNumber})
           </Text>
         </View>
 
