@@ -8,12 +8,12 @@
       "appVersionSource": "local"
     },
     "orientation": "portrait",
-    "icon": "./assets/images/msd-logo.jpeg",
+    "icon": "./assets/images/msd-logo.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "scheme": "mysocietydetails",
     "splash": {
-      "image": "./assets/images/msd-logo.jpeg",
+      "image": "./assets/images/msd-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#121212"
     },
@@ -25,7 +25,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/msd-logo.jpeg",
+        "foregroundImage": "./assets/images/msd-logo.png",
         "backgroundColor": "#121212"
       },
       "edgeToEdgeEnabled": true,
@@ -45,7 +45,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/msd-logo.jpeg",
+          "icon": "./assets/images/msd-logo.png",
           "color": "#4361EE"
         }
       ]

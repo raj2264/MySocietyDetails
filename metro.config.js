@@ -30,8 +30,14 @@ config.resolver.blockList = [
   /\/node_modules\/@supabase\/realtime-js\/.*/,
 ];
 
-// Configure resolver to prioritize our mocks
-config.resolver.sourceExts = ['js', 'jsx', 'ts', 'tsx', 'json'];
-config.resolver.assetExts = ['mjs', 'db', 'ttf', 'woff', 'woff2', 'otf', 'png', 'jpg'];
+// Add 'db' to asset extensions for SQLite support
+if (!config.resolver.assetExts.includes('db')) {
+  config.resolver.assetExts.push('db');
+}
+// Ensure 'mjs' is in sourceExts (not assetExts) so .mjs JS modules compile correctly
+config.resolver.assetExts = config.resolver.assetExts.filter(ext => ext !== 'mjs');
+if (!config.resolver.sourceExts.includes('mjs')) {
+  config.resolver.sourceExts.push('mjs');
+}
 
 module.exports = config; 

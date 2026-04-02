@@ -6,7 +6,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from '../context/AuthContext';
 import { ThemeProvider, useTheme, darkTheme } from '../context/ThemeContext';
-import '../polyfills'; // Import polyfills before any network operations
 import { supabase } from '../lib/supabase';
 import { SessionProvider } from '../context/SessionContext';
 import * as SplashScreen from 'expo-splash-screen';
