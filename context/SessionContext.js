@@ -11,9 +11,18 @@ export function SessionProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // DON'T make a network call here — AuthContext already handles session restoration.
-    // Just listen for auth state changes to stay in sync.
-    setLoading(false);
+    const initializeSession = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (!error) {
+          setSession(data?.session ?? null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeSession();
 
     // Subscribe to auth state changes (AuthContext drives the actual auth flow)
     const { data: authListener } = supabase.auth.onAuthStateChange(

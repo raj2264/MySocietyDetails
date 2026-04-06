@@ -115,15 +115,15 @@ export default function HomeScreen() {
   const handleSignOut = async () => {
     setIsLoading(true);
     try {
-      const { error } = await signOut();
-      if (error) {
-        Alert.alert('Error', error);
-      } else {
-        // Navigate to login screen
-        router.replace('/login');
+      const result = await signOut();
+      if (result?.error) {
+        Alert.alert('Error', result.error);
       }
+      // Navigate to login screen regardless — state is already cleared
+      router.replace('/login');
     } catch (err) {
-      Alert.alert('Error', 'Failed to sign out. Please try again.');
+      // State is already cleared in AuthContext, just navigate
+      router.replace('/login');
     } finally {
       setIsLoading(false);
     }
