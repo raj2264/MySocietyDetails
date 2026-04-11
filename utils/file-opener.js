@@ -1,7 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
-import * as Sharing from 'expo-sharing';
-import { Platform, Alert } from 'react-native';
+import { Platform, Alert, Linking } from 'react-native';
 
 const MIME_TYPES = {
   pdf: 'application/pdf',
@@ -34,32 +33,29 @@ export async function openFileLocally(url, options = {}) {
   const { fileName, mimeType } = options;
   const resolvedName = fileName || getFileName(url);
   const resolvedMime = mimeType || getMimeType(url);
-  const tempUri = FileSystem.cacheDirectory + resolvedName;
+  const isRemoteUrl = /^https?:\/\//i.test(url);
+  const localUri = isRemoteUrl ? FileSystem.cacheDirectory + resolvedName : url;
 
   try {
-    const downloadResult = await FileSystem.downloadAsync(url, tempUri);
+    if (isRemoteUrl) {
+      const downloadResult = await FileSystem.downloadAsync(url, localUri);
 
-    if (downloadResult.status !== 200) {
-      throw new Error('Download failed');
+      if (downloadResult.status !== 200) {
+        throw new Error('Download failed');
+      }
     }
 
     if (Platform.OS === 'android') {
-      // Use FileSystem to get a content URI for the downloaded file
-      const contentUri = await FileSystem.getContentUriAsync(tempUri);
+      // Use FileSystem to get a content URI for the local file
+      const contentUri = await FileSystem.getContentUriAsync(localUri);
       await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
         data: contentUri,
         flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
         type: resolvedMime,
       });
     } else {
-      // iOS: use Sharing to open
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(tempUri, {
-          mimeType: resolvedMime,
-          UTI: resolvedMime === 'application/pdf' ? 'com.adobe.pdf' : undefined,
-        });
-      }
+      // iOS: hand the local file to the system opener instead of the share sheet
+      await Linking.openURL(localUri);
     }
   } catch (error) {
     console.error('Error opening file locally:', error);

@@ -74,7 +74,13 @@ const BillsScreen = () => {
 
   const fetchBills = useCallback(async () => {
     try {
-      if (!residentData?.id) return;
+      if (!residentData?.id) {
+        setBills([]);
+        setCompletedPayments([]);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
 
       const { data, error } = await supabase
         .from('maintenance_bills')
@@ -185,21 +191,12 @@ const BillsScreen = () => {
         html: receiptHTML,
         base64: false,
       });
-      
+
       // Open the locally generated PDF directly (no download needed)
-      if (Platform.OS === 'android') {
-        const contentUri = await FileSystem.getContentUriAsync(uri);
-        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-          data: contentUri,
-          flags: 1,
-          type: 'application/pdf',
-        });
-      } else {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'application/pdf',
-          UTI: 'com.adobe.pdf',
-        });
-      }
+      await openFileLocally(uri, {
+        fileName: `receipt_${receipt.receipt_number}.pdf`,
+        mimeType: 'application/pdf',
+      });
     } catch (error) {
       console.error('Error downloading receipt:', error);
       Alert.alert('Error', error.message || 'Failed to download receipt');
@@ -215,7 +212,13 @@ const BillsScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      if (!residentData?.id) return;
+      if (!residentData?.id) {
+        setLoading(false);
+        setRefreshing(false);
+        setBills([]);
+        setCompletedPayments([]);
+        return;
+      }
       
       const shouldShowLoader = !hasLoadedOnceRef.current;
       if (shouldShowLoader) {
@@ -293,6 +296,11 @@ const BillsScreen = () => {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
+      if (!residentData?.id) {
+        setBills([]);
+        setCompletedPayments([]);
+        return;
+      }
       await fetchBills();
     } catch (error) {
       console.error('Error during refresh:', error);
