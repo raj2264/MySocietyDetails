@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, useWindowDimensions, Linking, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions, Linking, TouchableOpacity } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import AppLayout from '../components/AppLayout';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,9 @@ import appJson from '../app.json';
 export default function AboutUs() {
   const { theme, isDarkMode } = useTheme();
   const { width } = useWindowDimensions();
+  const contentWidth = Math.min(width - 24, 920);
+  const isTabletLayout = contentWidth >= 700;
+  const featureCardWidth = isTabletLayout ? (contentWidth - 40 - 16) / 2 : contentWidth - 40;
   const appVersion = appJson.expo.version;
   const buildNumber = appJson.expo.android.versionCode;
 
@@ -46,8 +49,10 @@ export default function AboutUs() {
     <AppLayout title="About Us">
       <ScrollView 
         style={[styles.container, { backgroundColor: theme.background }]}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        <View style={[styles.contentWrapper, { width: contentWidth }]}> 
         {/* Hero Section */}
         <View style={styles.heroSection}>
           <View style={[styles.logoContainer, { backgroundColor: theme.primary + '15' }]}>
@@ -88,7 +93,7 @@ export default function AboutUs() {
                   { 
                     backgroundColor: isDarkMode ? theme.card + '40' : theme.card,
                     borderColor: theme.border,
-                    width: width > 600 ? (width - 48) / 2 : width - 32
+                    width: featureCardWidth
                   }
                 ]}
               >
@@ -105,7 +110,6 @@ export default function AboutUs() {
             ))}
           </View>
         </View>
-
         {/* Contact Section */}
         <View style={[styles.section, styles.contactSection]}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>
@@ -137,6 +141,7 @@ export default function AboutUs() {
             </TouchableOpacity>
           </View>
         </View>
+        </View>
       </ScrollView>
     </AppLayout>
   );
@@ -145,6 +150,13 @@ export default function AboutUs() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    alignItems: 'center',
+    paddingBottom: 24,
+  },
+  contentWrapper: {
+    maxWidth: 920,
   },
   heroSection: {
     alignItems: 'center',

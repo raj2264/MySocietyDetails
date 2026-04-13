@@ -5,7 +5,6 @@ import AppLayout from '../components/AppLayout';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import * as FileSystem from 'expo-file-system/legacy';
-import * as DocumentPicker from 'expo-document-picker';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import * as IntentLauncher from 'expo-intent-launcher';
@@ -154,33 +153,23 @@ export default function Documents() {
           throw new Error('No location selected');
         }
       } else {
-        // For iOS, use document picker to choose save location
-        const result = await DocumentPicker.getDocumentAsync({
-          type: 'application/pdf',
-          copyToCacheDirectory: false,
-          multiple: false,
-          mode: 'save',
-          suggestedFileName: fileName
-        });
+        // iOS: download to cache, then let user save/share via system sheet.
+        const tempUri = FileSystem.cacheDirectory + fileName;
+        const downloadResult = await FileSystem.downloadAsync(signedUrl, tempUri);
 
-        if (result.type === 'success') {
-          const downloadResult = await FileSystem.downloadAsync(signedUrl, result.uri);
-          
-          if (downloadResult.status === 200) {
-            Alert.alert(
-              'Success',
-              'Document downloaded successfully',
-              [
-                {
-                  text: 'Open',
-                  onPress: () => handleViewDocument(document)
-                },
-                { text: 'OK' }
-              ]
-            );
-          } else {
-            throw new Error('Download failed');
+        if (downloadResult.status === 200) {
+          const canShare = await Sharing.isAvailableAsync();
+          if (!canShare) {
+            throw new Error('Sharing is not available on this device');
           }
+
+          await Sharing.shareAsync(tempUri, {
+            mimeType: 'application/pdf',
+            dialogTitle: 'Save or Share Document',
+            UTI: 'com.adobe.pdf'
+          });
+        } else {
+          throw new Error('Download failed');
         }
       }
     } catch (error) {

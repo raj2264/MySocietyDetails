@@ -36,41 +36,42 @@ export async function openFileLocally(url, options = {}) {
   const resolvedMime = mimeType || getMimeType(url);
   const isRemoteUrl = /^https?:\/\//i.test(url);
   const localUri = isRemoteUrl ? FileSystem.cacheDirectory + resolvedName : url;
+  let openableUri = localUri;
 
   try {
-    if (Platform.OS === 'ios' && isRemoteUrl) {
-      // iOS reliably previews PDFs when opened directly from https URL.
-      const canOpenRemote = await Linking.canOpenURL(url);
-      if (!canOpenRemote) {
-        throw new Error('Cannot open remote file URL');
-      }
-      await Linking.openURL(url);
-      return;
-    }
-
     if (isRemoteUrl) {
       const downloadResult = await FileSystem.downloadAsync(url, localUri);
 
       if (downloadResult.status !== 200) {
         throw new Error('Download failed');
       }
+
+      if (downloadResult.uri) {
+        openableUri = downloadResult.uri;
+      }
+    }
+
+    const fileInfo = await FileSystem.getInfoAsync(openableUri);
+    if (!fileInfo.exists) {
+      throw new Error('Downloaded file not found');
     }
 
     if (Platform.OS === 'android') {
       // Use FileSystem to get a content URI for the local file
-      const contentUri = await FileSystem.getContentUriAsync(localUri);
+      const contentUri = await FileSystem.getContentUriAsync(openableUri);
       await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
         data: contentUri,
         flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
         type: resolvedMime,
       });
     } else {
-      // iOS fallback for local files.
-      const canOpenLocal = await Linking.canOpenURL(localUri);
+      // iOS opens only local file URIs here, never remote signed URLs.
+      const encodedUri = encodeURI(openableUri);
+      const canOpenLocal = await Linking.canOpenURL(encodedUri);
       if (canOpenLocal) {
-        await Linking.openURL(localUri);
+        await Linking.openURL(encodedUri);
       } else if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(localUri, {
+        await Sharing.shareAsync(openableUri, {
           mimeType: resolvedMime,
           UTI: 'com.adobe.pdf',
         });
@@ -80,6 +81,20 @@ export async function openFileLocally(url, options = {}) {
     }
   } catch (error) {
     console.error('Error opening file locally:', error);
+
+    // Final fallback: open original URL only if local open/share fails.
+    if (isRemoteUrl) {
+      try {
+        const canOpenRemote = await Linking.canOpenURL(url);
+        if (canOpenRemote) {
+          await Linking.openURL(url);
+          return;
+        }
+      } catch (fallbackError) {
+        console.error('Remote URL fallback failed:', fallbackError);
+      }
+    }
+
     Alert.alert('Error', 'Failed to open file. Please try again.');
     throw error;
   }

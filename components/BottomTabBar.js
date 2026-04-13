@@ -118,7 +118,7 @@ export default memo(function BottomTabBar() {
   
   const handleNavigation = (route) => {
     // Don't navigate if already on this route
-    if (route === pathname) return;
+    if (`/${route}` === pathname) return;
     
     // Platform-specific optimization
     if (Platform.OS === 'android') {
@@ -127,12 +127,14 @@ export default memo(function BottomTabBar() {
       return;
     }
     
-    // For iOS, use minimal animation
-    Animated.timing(tabAnimations[currentTabIndex], {
-      toValue: 0.9, // Less extreme for smoother feel
-      duration: 40, // Ultra fast
-      useNativeDriver: true
-    }).start();
+    // For iOS, animate only when current route maps to a tab index.
+    if (currentTabIndex >= 0 && tabAnimations[currentTabIndex]) {
+      Animated.timing(tabAnimations[currentTabIndex], {
+        toValue: 0.9, // Less extreme for smoother feel
+        duration: 40, // Ultra fast
+        useNativeDriver: true
+      }).start();
+    }
     
     // Navigate with replace to avoid stacking screens
     router.replace(`/${route}`);
