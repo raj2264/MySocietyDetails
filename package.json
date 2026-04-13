@@ -1,6 +1,6 @@
 {
   "name": "mysocietyapp",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "main": "index.js",
   "scripts": {
     "eas-build-pre-install": "npm install --package-lock-only",
