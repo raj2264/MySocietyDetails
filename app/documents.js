@@ -5,7 +5,6 @@ import AppLayout from '../components/AppLayout';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import * as FileSystem from 'expo-file-system/legacy';
-import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { openFileLocally } from '../utils/file-opener';
@@ -24,20 +23,6 @@ export default function Documents() {
   useEffect(() => {
     isMountedRef.current = true;
     fetchDocuments();
-    // Request permissions for saving files
-    (async () => {
-      if (!isMountedRef.current) return;
-      if (Platform.OS === 'android') {
-        const { status } = await MediaLibrary.requestPermissionsAsync();
-        if (isMountedRef.current && status !== 'granted') {
-          Alert.alert(
-            'Permission Required',
-            'Please grant storage permission to download documents.',
-            [{ text: 'OK' }]
-          );
-        }
-      }
-    })();
 
     return () => {
       isMountedRef.current = false;

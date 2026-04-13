@@ -353,22 +353,27 @@ export default function HomeScreen() {
           }
         ]}>
           {/* Welcome Card - Split into two elements: outer (JS animations) and inner (native animations) */}
-          <Animated.View style={[
-            styles.welcomeCard,
-            { 
-              backgroundColor: welcomeGradient,
-              elevation: 5,
-              shadowColor: isDarkMode ? '#1A2535' : '#3351DE',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
-              shadowRadius: cardBorderGlow,
-            }
-          ]}>
-            {/* Inner content with native-driver animations */}
-            <Animated.View style={{
-              width: '100%',
-              transform: [{ scale: welcomeCardAnim }],
-            }}>
+          <TouchableOpacity
+            activeOpacity={0.92}
+            onPress={() => handleNavigate('/profile')}
+            style={styles.welcomeCardTouchable}
+          >
+            <Animated.View style={[
+              styles.welcomeCard,
+              {
+                backgroundColor: welcomeGradient,
+                elevation: 5,
+                shadowColor: isDarkMode ? '#1A2535' : '#3351DE',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: cardBorderGlow,
+              }
+            ]}>
+              {/* Inner content with native-driver animations */}
+              <Animated.View style={{
+                width: '100%',
+                transform: [{ scale: welcomeCardAnim }],
+              }}>
               {/* Shimmer effect */}
               <Animated.View style={[
                 styles.shimmer,
@@ -418,8 +423,9 @@ export default function HomeScreen() {
                   </Text>
                 </View>
               </View>
+              </Animated.View>
             </Animated.View>
-          </Animated.View>
+          </TouchableOpacity>
           
           {/* Quick Actions Section */}
           <Animated.Text style={[
@@ -544,6 +550,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 6,
     position: 'relative',
+  },
+  welcomeCardTouchable: {
+    width: '100%',
   },
   welcomeContentWrapper: {
     flexDirection: 'row',
