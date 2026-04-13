@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { Platform, Alert, Linking } from 'react-native';
+import * as Sharing from 'expo-sharing';
 
 const MIME_TYPES = {
   pdf: 'application/pdf',
@@ -37,6 +38,16 @@ export async function openFileLocally(url, options = {}) {
   const localUri = isRemoteUrl ? FileSystem.cacheDirectory + resolvedName : url;
 
   try {
+    if (Platform.OS === 'ios' && isRemoteUrl) {
+      // iOS reliably previews PDFs when opened directly from https URL.
+      const canOpenRemote = await Linking.canOpenURL(url);
+      if (!canOpenRemote) {
+        throw new Error('Cannot open remote file URL');
+      }
+      await Linking.openURL(url);
+      return;
+    }
+
     if (isRemoteUrl) {
       const downloadResult = await FileSystem.downloadAsync(url, localUri);
 
@@ -54,8 +65,18 @@ export async function openFileLocally(url, options = {}) {
         type: resolvedMime,
       });
     } else {
-      // iOS: hand the local file to the system opener instead of the share sheet
-      await Linking.openURL(localUri);
+      // iOS fallback for local files.
+      const canOpenLocal = await Linking.canOpenURL(localUri);
+      if (canOpenLocal) {
+        await Linking.openURL(localUri);
+      } else if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(localUri, {
+          mimeType: resolvedMime,
+          UTI: 'com.adobe.pdf',
+        });
+      } else {
+        throw new Error('No supported app available to open this file');
+      }
     }
   } catch (error) {
     console.error('Error opening file locally:', error);

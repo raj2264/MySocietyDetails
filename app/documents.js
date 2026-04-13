@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Platform, Linking, Share } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import AppLayout from '../components/AppLayout';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,14 +20,17 @@ export default function Documents() {
   const [refreshing, setRefreshing] = useState(false);
   const [downloading, setDownloading] = useState({});
   const [sharing, setSharing] = useState({});
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     fetchDocuments();
     // Request permissions for saving files
     (async () => {
+      if (!isMountedRef.current) return;
       if (Platform.OS === 'android') {
         const { status } = await MediaLibrary.requestPermissionsAsync();
-        if (status !== 'granted') {
+        if (isMountedRef.current && status !== 'granted') {
           Alert.alert(
             'Permission Required',
             'Please grant storage permission to download documents.',
@@ -36,30 +39,41 @@ export default function Documents() {
         }
       }
     })();
+
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
-  const fetchDocuments = async (showLoader = true) => {
+  const fetchDocuments = useCallback(async (showLoader = true) => {
     try {
-      if (showLoader) setLoading(true);
+      if (showLoader && isMountedRef.current) setLoading(true);
       const { data, error } = await supabase
         .from('essential_documents')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setDocuments(data || []);
+      if (isMountedRef.current) {
+        setDocuments(data || []);
+      }
     } catch (error) {
       console.error('Error fetching documents:', error);
-      Alert.alert('Error', 'Failed to fetch documents');
+      if (isMountedRef.current) {
+        Alert.alert('Error', 'Failed to fetch documents');
+      }
     } finally {
-      if (showLoader) setLoading(false);
+      if (showLoader && isMountedRef.current) setLoading(false);
     }
-  };
+  }, []);
 
   const onRefresh = async () => {
+    if (!isMountedRef.current) return;
     setRefreshing(true);
     await fetchDocuments(false);
-    setRefreshing(false);
+    if (isMountedRef.current) {
+      setRefreshing(false);
+    }
   };
 
   const getSignedUrl = async (document) => {
@@ -102,6 +116,7 @@ export default function Documents() {
   const handleDownload = async (document) => {
     if (downloading[document.id]) return;
 
+    if (!isMountedRef.current) return;
     setDownloading(prev => ({ ...prev, [document.id]: true }));
     try {
       const signedUrl = await getSignedUrl(document);
@@ -170,18 +185,23 @@ export default function Documents() {
       }
     } catch (error) {
       console.error('Error downloading document:', error);
-      Alert.alert(
-        'Error',
-        'Failed to download document: ' + error.message
-      );
+      if (isMountedRef.current) {
+        Alert.alert(
+          'Error',
+          'Failed to download document: ' + error.message
+        );
+      }
     } finally {
-      setDownloading(prev => ({ ...prev, [document.id]: false }));
+      if (isMountedRef.current) {
+        setDownloading(prev => ({ ...prev, [document.id]: false }));
+      }
     }
   };
 
   const handleShare = async (document) => {
     if (sharing[document.id]) return;
 
+    if (!isMountedRef.current) return;
     setSharing(prev => ({ ...prev, [document.id]: true }));
     try {
       const signedUrl = await getSignedUrl(document);
@@ -207,12 +227,16 @@ export default function Documents() {
       }
     } catch (error) {
       console.error('Error sharing document:', error);
-      Alert.alert(
-        'Error',
-        'Failed to share document: ' + error.message
-      );
+      if (isMountedRef.current) {
+        Alert.alert(
+          'Error',
+          'Failed to share document: ' + error.message
+        );
+      }
     } finally {
-      setSharing(prev => ({ ...prev, [document.id]: false }));
+      if (isMountedRef.current) {
+        setSharing(prev => ({ ...prev, [document.id]: false }));
+      }
     }
   };
 
@@ -286,7 +310,7 @@ export default function Documents() {
         <FlatList
           data={documents}
           renderItem={renderDocument}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
           refreshing={refreshing}
           onRefresh={onRefresh}
