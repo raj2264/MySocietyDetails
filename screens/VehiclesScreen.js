@@ -39,7 +39,14 @@ export default function VehiclesScreen() {
   // Load vehicles when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      if (!residentData?.id || isFetchingRef.current) return;
+      if (!residentData?.id) {
+        setVehicles([]);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
+      if (isFetchingRef.current) return;
       const shouldShowLoader = !hasLoadedOnceRef.current;
       if (shouldShowLoader) {
         setLoading(true);
@@ -64,6 +71,9 @@ export default function VehiclesScreen() {
 
   const loadVehicles = useCallback(async () => {
     if (!residentData?.id) {
+      setVehicles([]);
+      setLoading(false);
+      setRefreshing(false);
       return;
     }
     
@@ -81,6 +91,12 @@ export default function VehiclesScreen() {
   }, [residentData?.id]);
 
   const handleRefresh = () => {
+    if (!residentData?.id) {
+      setVehicles([]);
+      setRefreshing(false);
+      return;
+    }
+
     if (isFetchingRef.current) return;
     setRefreshing(true);
     isFetchingRef.current = true;

@@ -1,67 +1,33 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from './AuthContext';
 
 // Create context
 const SessionContext = createContext(null);
 
 // Create provider
 export function SessionProvider({ children }) {
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const initializeSession = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        if (!error) {
-          setSession(data?.session ?? null);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeSession();
-
-    // Subscribe to auth state changes (AuthContext drives the actual auth flow)
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
-        setSession(newSession);
-        
-        if (event === 'SIGNED_OUT') {
-          await AsyncStorage.removeItem('guard_data');
-        }
-      }
-    );
-
-    // Clean up subscription
-    return () => {
-      if (authListener && authListener.subscription) {
-        authListener.subscription.unsubscribe();
-      }
-    };
-  }, []);
+  const { session, loading } = useAuth();
+  const [refreshing, setRefreshing] = useState(false);
 
   // Value to be provided by the context
-  const value = {
+  const value = useMemo(() => ({
     session,
-    isLoading: loading,
+    isLoading: loading || refreshing,
     refreshSession: async () => {
-      setLoading(true);
+      setRefreshing(true);
       try {
         const { data, error } = await supabase.auth.refreshSession();
         if (error) throw error;
-        setSession(data.session);
-        return data.session;
+        return data?.session ?? null;
       } catch (error) {
         console.error('Error refreshing session:', error);
         return null;
       } finally {
-        setLoading(false);
+        setRefreshing(false);
       }
     }
-  };
+  }), [loading, refreshing, session]);
 
   return (
     <SessionContext.Provider value={value}>

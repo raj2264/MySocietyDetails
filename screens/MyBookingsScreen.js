@@ -34,6 +34,9 @@ const MyBookingsScreen = () => {
 
   const loadBookings = async () => {
     if (!residentData?.id) {
+      setBookings([]);
+      setLoading(false);
+      setRefreshing(false);
       return;
     }
     
@@ -116,10 +119,11 @@ const MyBookingsScreen = () => {
               if (error) throw error;
               
               Alert.alert('Success', 'Booking cancelled successfully');
-              loadBookings();
+              await loadBookings();
             } catch (error) {
               console.error('Error cancelling booking:', error);
               Alert.alert('Error', 'Failed to cancel booking');
+            } finally {
               setLoading(false);
             }
           }

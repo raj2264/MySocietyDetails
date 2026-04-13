@@ -45,6 +45,9 @@ export default function CARequestScreen() {
   // Fetch user's CA requests
   const fetchMyRequests = useCallback(async () => {
     if (!residentData?.id) {
+      setMyRequests([]);
+      setRequestsLoading(false);
+      setRefreshing(false);
       return;
     }
     
@@ -69,7 +72,12 @@ export default function CARequestScreen() {
   // Fetch requests when screen is focused
   useFocusEffect(
     useCallback(() => {
-      if (!residentData?.id) return;
+      if (!residentData?.id) {
+        setMyRequests([]);
+        setRequestsLoading(false);
+        setRefreshing(false);
+        return;
+      }
       const shouldShowLoader = !hasLoadedOnceRef.current;
       if (shouldShowLoader) {
         setRequestsLoading(true);
@@ -83,9 +91,14 @@ export default function CARequestScreen() {
 
   // Handle refresh
   const handleRefresh = useCallback(() => {
+    if (!residentData?.id) {
+      setMyRequests([]);
+      setRefreshing(false);
+      return;
+    }
     setRefreshing(true);
     fetchMyRequests();
-  }, [fetchMyRequests]);
+  }, [fetchMyRequests, residentData?.id]);
 
   // Populate user info on mount
   useEffect(() => {

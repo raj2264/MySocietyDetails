@@ -67,7 +67,14 @@ export default function VisitorsScreen() {
   // Load visitors when screen is focused
   useFocusEffect(
     useCallback(() => {
-      if (!residentData?.id || isFetchingRef.current) return;
+      if (!residentData?.id) {
+        setVisitors([]);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
+      if (isFetchingRef.current) return;
       const shouldShowLoader = !hasLoadedOnceRef.current;
       if (shouldShowLoader) {
         setLoading(true);
@@ -86,6 +93,9 @@ export default function VisitorsScreen() {
 
   const loadVisitors = useCallback(async () => {
     if (!residentData?.id) {
+      setVisitors([]);
+      setLoading(false);
+      setRefreshing(false);
       return;
     }
 
@@ -111,6 +121,12 @@ export default function VisitorsScreen() {
   }, [residentData?.id]);
 
   const handleRefresh = () => {
+    if (!residentData?.id) {
+      setVisitors([]);
+      setRefreshing(false);
+      return;
+    }
+
     if (isFetchingRef.current) return;
     setRefreshing(true);
     isFetchingRef.current = true;

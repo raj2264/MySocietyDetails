@@ -11,6 +11,9 @@ import {
   Alert,
   Platform,
   Dimensions,
+  KeyboardAvoidingView,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
@@ -158,16 +161,27 @@ const VehicleForm = ({ visible, onClose, vehicle, residentId }) => {
       animationType="slide"
       onRequestClose={handleCancel}
     >
-      <View style={styles.overlay}>
-        <View style={[styles.container, { backgroundColor: theme.card }]}>
-          <View style={[styles.header, { borderBottomColor: theme.border }]}>
-            <Text style={[styles.title, { color: theme.text }]}>{isEditMode ? 'Edit Vehicle' : 'Add New Vehicle'}</Text>
-            <TouchableOpacity style={styles.closeButton} onPress={handleCancel}>
-              <Ionicons name="close-circle" size={28} color={textSecondary} />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View style={styles.overlay}>
+          <KeyboardAvoidingView
+            style={[styles.container, { backgroundColor: theme.card }]}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+          >
+            <View style={[styles.header, { borderBottomColor: theme.border }]}> 
+              <Text style={[styles.title, { color: theme.text }]}>{isEditMode ? 'Edit Vehicle' : 'Add New Vehicle'}</Text>
+              <TouchableOpacity style={styles.closeButton} onPress={handleCancel}>
+                <Ionicons name="close-circle" size={28} color={textSecondary} />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView
+              style={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              contentContainerStyle={styles.formScrollContent}
+            >
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Vehicle Type</Text>
             {renderTypeSelector()}
             
@@ -318,9 +332,10 @@ const VehicleForm = ({ visible, onClose, vehicle, residentId }) => {
                 )}
               </TouchableOpacity>
             </View>
-          </ScrollView>
+            </ScrollView>
+          </KeyboardAvoidingView>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 };
@@ -361,6 +376,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 18,
+  },
+  formScrollContent: {
+    paddingBottom: 12,
   },
   sectionTitle: {
     fontSize: 17,

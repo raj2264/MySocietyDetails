@@ -1,27 +1,24 @@
 {
   "expo": {
     "owner": "pratham886",
-    "name": "My Society Details Closed Testing",
+    "name": "My Society Details",
     "slug": "my-society-details",
-    "version": "1.0.7",
-    "cli": {
-      "appVersionSource": "local"
-    },
+    "version": "1.0.9",
     "orientation": "portrait",
     "icon": "./assets/images/msd-logo.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "scheme": "mysocietydetails",
-    "splash": {
-      "image": "./assets/images/msd-logo.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#121212"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.MySocietyApp",
+      "buildNumber": "1.0.9",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -31,7 +28,7 @@
       "edgeToEdgeEnabled": true,
       "package": "com.anonymous.MySocietyApp",
       "softwareKeyboardLayoutMode": "pan",
-      "versionCode": 7,
+      "versionCode": 9,
       "permissions": [
         "CAMERA"
       ]
@@ -41,16 +38,24 @@
     },
     "plugins": [
       "expo-router",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/msd-logo.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#F1F2F4"
+        }
+      ],
       [
         "expo-notifications",
         {
           "icon": "./assets/images/msd-logo.png",
           "color": "#4361EE"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
-    "entryPoint": "./index.js",
     "extra": {
       "router": {},
       "eas": {

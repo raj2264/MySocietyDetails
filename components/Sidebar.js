@@ -29,11 +29,16 @@ const CLOSE_SPRING = { tension: 75, friction: 12, useNativeDriver: true };
 
 export default function Sidebar({ isOpen, onClose, translateX }) {
   const { theme, isDarkMode } = useTheme();
-  const { user, signOut, residentData } = useAuth();
+  const { user, signOut, residentData, avatarRefreshToken } = useAuth();
   const router = useRouter();
   const currentPath = usePathname();
   const insets = useSafeAreaInsets();
   const [isRequestsOpen, setIsRequestsOpen] = useState(false);
+
+  const avatarBaseUrl = residentData?.avatar_url || user?.user_metadata?.avatar_url;
+  const avatarUri = avatarBaseUrl
+    ? `${avatarBaseUrl}${avatarBaseUrl.includes('?') ? '&' : '?'}r=${avatarRefreshToken}`
+    : 'https://xsgames.co/randomusers/avatar.php?g=pixel';
   
   // Staggered menu item animations
   const menuItemAnims = useRef(
@@ -233,9 +238,7 @@ export default function Sidebar({ isOpen, onClose, translateX }) {
             activeOpacity={0.7}
           >
             <Image 
-              source={{ 
-                uri: user?.user_metadata?.avatar_url || residentData?.avatar_url || 'https://xsgames.co/randomusers/avatar.php?g=pixel' 
-              }}
+              source={{ uri: avatarUri }}
               style={styles.avatar}
             />
             <View style={styles.userTextContainer}>

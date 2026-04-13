@@ -114,6 +114,14 @@ export default function RootLayout() {
   const initialBg = colorScheme === 'dark' ? '#121212' : '#FFFFFF';
   const [appResetKey, setAppResetKey] = useState(0);
 
+  useEffect(() => {
+    const fallbackTimer = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    }, 1400);
+
+    return () => clearTimeout(fallbackTimer);
+  }, []);
+
   const handleBoundaryRetry = useCallback(() => {
     setAppResetKey(prev => prev + 1);
   }, []);

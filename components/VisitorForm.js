@@ -10,7 +10,10 @@ import {
   ScrollView,
   Alert,
   Platform,
-  FlatList
+  FlatList,
+  KeyboardAvoidingView,
+  Keyboard,
+  TouchableWithoutFeedback
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
@@ -232,8 +235,13 @@ const SimpleDateTimePicker = ({ visible, onClose, onSelect, initialDate, isDarkM
       visible={visible}
       onRequestClose={onClose}
     >
-      <View style={[styles.simpleDatePickerOverlay, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}>
-        <View style={[styles.simpleDatePickerContent, { backgroundColor: isDarkMode ? '#2A2A2A' : 'white' }]}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View style={[styles.simpleDatePickerOverlay, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}> 
+          <KeyboardAvoidingView
+            style={[styles.simpleDatePickerContent, { backgroundColor: isDarkMode ? '#2A2A2A' : 'white' }]}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+          >
           <View style={[styles.simpleDatePickerHeader, { borderBottomColor: isDarkMode ? '#333333' : '#eee' }]}>
             <TouchableOpacity onPress={onClose}>
               <Text style={[styles.simpleDatePickerButton, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.textSecondary }]}>Cancel</Text>
@@ -659,8 +667,9 @@ const SimpleDateTimePicker = ({ visible, onClose, onSelect, initialDate, isDarkM
               </View>
             </View>
           )}
+          </KeyboardAvoidingView>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 };
@@ -766,7 +775,11 @@ export default function VisitorForm({ residentData, onSuccess }) {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+    >
       <View style={styles.formContainer}>
         <View style={[styles.formField, { backgroundColor: theme.card }]}>
           <Text style={[styles.label, { color: isDarkMode ? 'rgba(255,255,255,0.8)' : theme.textSecondary }]}>Visitor Name *</Text>

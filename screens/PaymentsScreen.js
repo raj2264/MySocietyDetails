@@ -33,6 +33,9 @@ export default function PaymentsScreen() {
     try {
       if (!residentData?.id) {
         console.log('No resident data available');
+        setPayments([]);
+        setLoading(false);
+        setRefreshing(false);
         return;
       }
 
@@ -46,7 +49,14 @@ export default function PaymentsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (!residentData?.id || isFetchingRef.current) return;
+      if (!residentData?.id) {
+        setPayments([]);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
+      if (isFetchingRef.current) return;
       const shouldShowLoader = !hasLoadedOnceRef.current;
       if (shouldShowLoader) {
         setLoading(true);
@@ -63,6 +73,12 @@ export default function PaymentsScreen() {
   );
 
   const onRefresh = () => {
+    if (!residentData?.id) {
+      setPayments([]);
+      setRefreshing(false);
+      return;
+    }
+
     if (isFetchingRef.current) return;
     setRefreshing(true);
     isFetchingRef.current = true;

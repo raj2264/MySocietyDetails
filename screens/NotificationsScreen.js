@@ -98,6 +98,9 @@ const NotificationsScreen = () => {
     try {
       if (!user?.id) {
         console.log('No user ID found');
+        setNotifications([]);
+        setIsLoading(false);
+        setIsRefreshing(false);
         return;
       }
       
@@ -121,7 +124,12 @@ const NotificationsScreen = () => {
   
   useFocusEffect(
     useCallback(() => {
-      if (!user?.id) return;
+      if (!user?.id) {
+        setNotifications([]);
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return;
+      }
       const shouldShowLoader = !hasLoadedOnceRef.current;
       if (shouldShowLoader) {
         setIsLoading(true);
@@ -139,6 +147,12 @@ const NotificationsScreen = () => {
   );
   
   const handleRefresh = async () => {
+    if (!user?.id) {
+      setNotifications([]);
+      setIsRefreshing(false);
+      return;
+    }
+
     setIsRefreshing(true);
     await loadNotifications(true);
     setIsRefreshing(false);

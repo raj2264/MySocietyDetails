@@ -13,7 +13,10 @@ import {
   Animated,
   Dimensions,
   Platform,
-  ScrollView
+  ScrollView,
+  KeyboardAvoidingView,
+  Keyboard,
+  TouchableWithoutFeedback
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
@@ -395,9 +398,14 @@ const ServicesScreen = () => {
           onRequestClose={handleCloseModal}
           statusBarTranslucent
         >
-          <View style={[styles.modalOverlay, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.02)' }]}>
-            <View style={styles.modalContainer}>
-              <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <View style={[styles.modalOverlay, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.02)' }]}>
+              <KeyboardAvoidingView
+                style={styles.modalContainer}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+              >
+                <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
                 <View style={styles.modalHeader}>
                   <Text style={[styles.modalTitle, { color: theme.text }]}>
                     Book Service
@@ -411,7 +419,12 @@ const ServicesScreen = () => {
                 </View>
 
                 {selectedService && (
-                  <>
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                    contentContainerStyle={styles.modalScrollContent}
+                  >
                     <View style={styles.serviceInfo}>
                       <Text style={[styles.serviceTitle, { color: theme.text }]}>
                         {selectedService.name}
@@ -492,11 +505,12 @@ const ServicesScreen = () => {
                         </>
                       )}
                     </TouchableOpacity>
-                  </>
+                  </ScrollView>
                 )}
               </View>
+              </KeyboardAvoidingView>
             </View>
-          </View>
+          </TouchableWithoutFeedback>
         </Modal>
       </View>
     </AppLayout>
@@ -676,6 +690,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     zIndex: 1002,
+  },
+  modalScrollContent: {
+    paddingBottom: 8,
   },
   modalHeader: {
     flexDirection: 'row',

@@ -15,6 +15,9 @@ import {
   TextInput,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../lib/supabase';
@@ -1258,6 +1261,13 @@ const BillsScreen = () => {
       justifyContent: 'space-between',
       marginTop: 16,
     },
+    refundKeyboardContainer: {
+      width: '100%',
+      alignItems: 'center',
+    },
+    refundScrollContent: {
+      paddingBottom: 8,
+    },
   });
 
   return (
@@ -1274,70 +1284,85 @@ const BillsScreen = () => {
           resetRefundForm();
         }}
       >
-        <View style={[styles.modalOverlay, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.02)' }]}>
-          <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>
-              Request Refund
-            </Text>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View style={[styles.modalOverlay, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.02)' }]}> 
+            <KeyboardAvoidingView
+              style={styles.refundKeyboardContainer}
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+            >
+              <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}> 
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                  contentContainerStyle={styles.refundScrollContent}
+                >
+                  <Text style={[styles.modalTitle, { color: theme.text }]}> 
+                    Request Refund
+                  </Text>
 
-            <TextInput
-              style={[styles.input, { 
-                backgroundColor: theme.inputBackground,
-                color: theme.text,
-                borderColor: theme.border,
-              }]}
-              placeholder="Refund Amount"
-              placeholderTextColor={theme.textSecondary}
-              value={refundAmount}
-              onChangeText={setRefundAmount}
-              keyboardType="numeric"
-            />
+                  <TextInput
+                    style={[styles.input, { 
+                      backgroundColor: theme.inputBackground,
+                      color: theme.text,
+                      borderColor: theme.border,
+                    }]}
+                    placeholder="Refund Amount"
+                    placeholderTextColor={theme.textSecondary}
+                    value={refundAmount}
+                    onChangeText={setRefundAmount}
+                    keyboardType="numeric"
+                  />
 
-            <TextInput
-              style={[styles.input, { 
-                backgroundColor: theme.inputBackground,
-                color: theme.text,
-                borderColor: theme.border,
-                height: 100,
-              }]}
-              placeholder="Refund Reason"
-              placeholderTextColor={theme.textSecondary}
-              value={refundReason}
-              onChangeText={setRefundReason}
-              multiline
-              numberOfLines={4}
-            />
+                  <TextInput
+                    style={[styles.input, { 
+                      backgroundColor: theme.inputBackground,
+                      color: theme.text,
+                      borderColor: theme.border,
+                      height: 100,
+                    }]}
+                    placeholder="Refund Reason"
+                    placeholderTextColor={theme.textSecondary}
+                    value={refundReason}
+                    onChangeText={setRefundReason}
+                    multiline
+                    numberOfLines={4}
+                  />
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: theme.error }]}
-                onPress={() => {
-                  setRefundModalVisible(false);
-                  resetRefundForm();
-                }}
-                disabled={submitting}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
+                  <View style={styles.modalButtons}>
+                    <TouchableOpacity
+                      style={[styles.modalButton, { backgroundColor: theme.error }]}
+                      onPress={() => {
+                        setRefundModalVisible(false);
+                        resetRefundForm();
+                      }}
+                      disabled={submitting}
+                    >
+                      <Text style={styles.modalButtonText}>Cancel</Text>
+                    </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[
-                  styles.modalButton,
-                  { backgroundColor: theme.primary },
-                  submitting && styles.disabledButton,
-                ]}
-                onPress={handleRefund}
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={styles.modalButtonText}>Request Refund</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+                    <TouchableOpacity
+                      style={[
+                        styles.modalButton,
+                        { backgroundColor: theme.primary },
+                        submitting && styles.disabledButton,
+                      ]}
+                      onPress={handleRefund}
+                      disabled={submitting}
+                    >
+                      {submitting ? (
+                        <ActivityIndicator color="white" />
+                      ) : (
+                        <Text style={styles.modalButtonText}>Request Refund</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              </View>
+            </KeyboardAvoidingView>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
     </AppLayout>
   );

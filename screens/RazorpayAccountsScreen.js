@@ -9,6 +9,11 @@ import {
   ActivityIndicator,
   TextInput,
   Modal,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
@@ -163,84 +168,99 @@ export default function RazorpayAccountsScreen() {
           resetForm()
         }}
       >
-        <View style={[styles.modalOverlay, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.02)' }]}>
-          <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>
-              Add Razorpay Account
-            </Text>
-            {selectedSociety && (
-              <Text style={[styles.selectedSociety, { color: theme.textSecondary }]}>
-                Society: {selectedSociety.name}
-              </Text>
-            )}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View style={[styles.modalOverlay, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.02)' }]}>
+            <KeyboardAvoidingView
+              style={styles.modalKeyboardContainer}
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+            >
+              <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}> 
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                  contentContainerStyle={styles.modalScrollContent}
+                >
+                  <Text style={[styles.modalTitle, { color: theme.text }]}> 
+                    Add Razorpay Account
+                  </Text>
+                  {selectedSociety && (
+                    <Text style={[styles.selectedSociety, { color: theme.textSecondary }]}> 
+                      Society: {selectedSociety.name}
+                    </Text>
+                  )}
 
-            <TextInput
-              style={[styles.input, { 
-                backgroundColor: theme.inputBackground,
-                color: theme.text,
-                borderColor: theme.border,
-              }]}
-              placeholder="Account ID"
-              placeholderTextColor={theme.textSecondary}
-              value={accountId}
-              onChangeText={setAccountId}
-            />
+                  <TextInput
+                    style={[styles.input, { 
+                      backgroundColor: theme.inputBackground,
+                      color: theme.text,
+                      borderColor: theme.border,
+                    }]}
+                    placeholder="Account ID"
+                    placeholderTextColor={theme.textSecondary}
+                    value={accountId}
+                    onChangeText={setAccountId}
+                  />
 
-            <TextInput
-              style={[styles.input, { 
-                backgroundColor: theme.inputBackground,
-                color: theme.text,
-                borderColor: theme.border,
-              }]}
-              placeholder="Key ID"
-              placeholderTextColor={theme.textSecondary}
-              value={keyId}
-              onChangeText={setKeyId}
-            />
+                  <TextInput
+                    style={[styles.input, { 
+                      backgroundColor: theme.inputBackground,
+                      color: theme.text,
+                      borderColor: theme.border,
+                    }]}
+                    placeholder="Key ID"
+                    placeholderTextColor={theme.textSecondary}
+                    value={keyId}
+                    onChangeText={setKeyId}
+                  />
 
-            <TextInput
-              style={[styles.input, { 
-                backgroundColor: theme.inputBackground,
-                color: theme.text,
-                borderColor: theme.border,
-              }]}
-              placeholder="Key Secret"
-              placeholderTextColor={theme.textSecondary}
-              value={keySecret}
-              onChangeText={setKeySecret}
-              secureTextEntry
-            />
+                  <TextInput
+                    style={[styles.input, { 
+                      backgroundColor: theme.inputBackground,
+                      color: theme.text,
+                      borderColor: theme.border,
+                    }]}
+                    placeholder="Key Secret"
+                    placeholderTextColor={theme.textSecondary}
+                    value={keySecret}
+                    onChangeText={setKeySecret}
+                    secureTextEntry
+                  />
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: theme.error }]}
-                onPress={() => {
-                  setModalVisible(false)
-                  resetForm()
-                }}
-                disabled={submitting}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
+                  <View style={styles.modalButtons}>
+                    <TouchableOpacity
+                      style={[styles.modalButton, { backgroundColor: theme.error }]}
+                      onPress={() => {
+                        setModalVisible(false)
+                        resetForm()
+                      }}
+                      disabled={submitting}
+                    >
+                      <Text style={styles.modalButtonText}>Cancel</Text>
+                    </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[
-                  styles.modalButton,
-                  { backgroundColor: theme.primary },
-                  submitting && styles.disabledButton,
-                ]}
-                onPress={handleAddAccount}
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={styles.modalButtonText}>Add Account</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+                    <TouchableOpacity
+                      style={[
+                        styles.modalButton,
+                        { backgroundColor: theme.primary },
+                        submitting && styles.disabledButton,
+                      ]}
+                      onPress={handleAddAccount}
+                      disabled={submitting}
+                    >
+                      {submitting ? (
+                        <ActivityIndicator color="white" />
+                      ) : (
+                        <Text style={styles.modalButtonText}>Add Account</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              </View>
+            </KeyboardAvoidingView>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
     </View>
   )
@@ -342,6 +362,13 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     borderRadius: 8,
+  modalKeyboardContainer: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalScrollContent: {
+    paddingBottom: 8,
+  },
     justifyContent: 'center',
     alignItems: 'center',
     marginHorizontal: 8,
