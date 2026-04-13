@@ -3,7 +3,7 @@
     "owner": "pratham886",
     "name": "My Society Details",
     "slug": "my-society-details",
-    "version": "1.0.12",
+    "version": "1.0.13",
     "orientation": "portrait",
     "icon": "./assets/images/msd-logo.png",
     "userInterfaceStyle": "automatic",
@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.MySocietyApp",
-      "buildNumber": "1.0.12",
+      "buildNumber": "1.0.13",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -28,7 +28,7 @@
       "edgeToEdgeEnabled": true,
       "package": "com.anonymous.MySocietyApp",
       "softwareKeyboardLayoutMode": "pan",
-      "versionCode": 12,
+      "versionCode": 13,
       "permissions": [
         "CAMERA"
       ],
